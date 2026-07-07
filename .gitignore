@@ -1,0 +1,43 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# Environments
+.venv/
+venv/
+.conda/
+
+# Local IDE / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+
+# Runtime data, caches, and large raw/browser artifacts
+data/raw_snapshots/
+data/lake/
+data/experiments/
+data/probes/
+data/**/raw/
+data/**/browser_downloads/
+*.parquet
+*.sqlite
+*.db
+
+# Keep small committed examples/documentation under data if needed.
+!data/
+!data/README.md
+!data/samples/
+!data/samples/**
