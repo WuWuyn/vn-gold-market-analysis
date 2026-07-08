@@ -47,6 +47,12 @@ Backfill the historical domestic SJC target:
 python scripts/pipeline/backfill_target.py --from 2011-07-06 --to 2026-07-06 --out-dir data/lake/audited
 ```
 
+Raw historical gold crawl (all available Vietnamese sources):
+
+```powershell
+python scripts/pipeline/crawl_raw_gold_history.py --from 2010-01-01 --to 2026-07-07 --out-dir data/lake/raw_gold_15y --format csv
+```
+
 Collect external features:
 
 ```powershell
@@ -57,6 +63,33 @@ Generate quality reports:
 
 ```powershell
 python scripts/pipeline/quality_report.py --data-lake data/lake/audited --from 2011-07-06 --to 2026-07-06
+```
+
+## Commit full data snapshot to git
+
+To include full generated data in git, we now track `data/` by default.
+
+```powershell
+git add data/lake/raw_gold_15y_full
+git add data/lake/audited
+git add data/lake/external_features
+git add README.md .gitignore
+git commit -m "chore: include full data snapshots"
+git push
+```
+
+If you want the **absolute full-data run** from scratch, run these extra steps:
+
+```powershell
+# Optional: install optional collectors
+python -m pip install yfinance vnstock
+
+# Raw full crawl (idempotent resume supported)
+python scripts/pipeline/crawl_raw_gold_history.py --from 2010-01-01 --to 2026-07-07 --out-dir data/lake/raw_gold_15y_full --sources sjc_official,webgia_sjc_archive,giavang_sjc_archive,giavang_pnj_archive --format csv,parquet
+
+# External features full + quality checks
+python scripts/pipeline/collect_external_features.py --from 2011-07-06 --to 2026-07-07 --out-dir data/lake/external_features
+python scripts/pipeline/quality_report.py --data-lake data/lake/audited --from 2011-07-06 --to 2026-07-07
 ```
 
 ## Current Source Decisions

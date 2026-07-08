@@ -1,0 +1,7 @@
+{
+  "url": "https://sjc.com.vn/GoldPrice/Services/PriceService.ashx",
+  "status": 200,
+  "text": "{\"success\":true,\"data\":[{\"Id\":0,\"TypeName\":\"Vàng SJC 1L, 10L, 1KG\",\"BranchName\":\"Hồ Chí Minh\",\"Buy\":\"35,360\",\"BuyValue\":35360000.0000,\"Sell\":\"35,410\",\"SellValue\":35410000.0000,\"BuyDiffer\":null,\"BuyDifferValue\":0,\"SellDiffer\":null,\"SellDifferValue\":0,\"GroupDate\":\"\\/Date(1398186000000)\\/\"}]}",
+  "raw_payload_hash": "38ca082e3eaa33a68d6cb384dd3ba185368c9ba0d2e689158ab3715f3e9a958f",
+  "from_cache": false
+}

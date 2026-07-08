@@ -25,14 +25,8 @@ venv/
 Thumbs.db
 .DS_Store
 
-# Runtime data, caches, and large raw/browser artifacts
-data/raw_snapshots/
-data/lake/
-data/experiments/
-data/probes/
-data/**/raw/
-data/**/browser_downloads/
-*.parquet
+# Runtime data folder is tracked when committing full dataset snapshots.
+# Keep local cleanup manual via git add/remove.
 *.sqlite
 *.db
 

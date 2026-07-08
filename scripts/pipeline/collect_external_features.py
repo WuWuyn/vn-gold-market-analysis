@@ -5,6 +5,7 @@ import json
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import Any
 
 try:
     from ._bootstrap import bootstrap
@@ -25,6 +26,11 @@ from gold_collectors.reliability import (
     collect_yfinance_prices,
 )
 
+try:
+    from tqdm import tqdm as _tqdm
+except Exception:  # pragma: no cover
+    _tqdm = None
+
 
 @dataclass(frozen=True)
 class FeatureSourceStatus:
@@ -43,7 +49,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--format", default="parquet,csv")
     parser.add_argument("--timeout", type=int, default=12)
     parser.add_argument("--retries", type=int, default=0)
+    parser.add_argument("--show-progress", action="store_true", default=True)
     return parser.parse_args()
+
+
+def _progress(items: list[tuple[str, str, Any]], description: str, enabled: bool) -> Any:
+    if not enabled or _tqdm is None:
+        return items
+    return _tqdm(items, desc=description, unit="datasets")
 
 
 def guarded(source: str, dataset: str, fn):
@@ -70,7 +83,7 @@ def main() -> int:
     }
     statuses: list[FeatureSourceStatus] = []
 
-    for source, dataset, fn in [
+    sources = [
         ("vietcombank_fx", "fx_rates", lambda: collect_vietcombank_fx(http)),
         ("sbv_central_fx_history", "fx_rates", lambda: collect_sbv_central_fx_history(args.from_date, args.to_date)),
         ("yfinance_gold", "global_market_series", lambda: collect_yfinance_prices(args.from_date, args.to_date)),
@@ -78,7 +91,8 @@ def main() -> int:
         ("worldbank_vietnam_macro", "macro_series", lambda: collect_worldbank_macro(http)),
         ("gso_macro_monitor", "macro_series", collect_gso_macro_monitor_features),
         ("vnstock_market_features", "vn_market_series", lambda: collect_optional_vnstock_features(args.from_date, args.to_date)),
-    ]:
+    ]
+    for source, dataset, fn in _progress(sources, "Collect external features", args.show_progress):
         rows, status = guarded(source, dataset, fn)
         datasets[dataset].extend(rows)
         statuses.append(status)

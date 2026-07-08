@@ -1,0 +1,22 @@
+{
+  "data_lake": "data\\lake\\audited",
+  "records": 28220,
+  "historical_valid_sources": [
+    "sjc_official_history"
+  ],
+  "current_only_sources": [
+    "btmc_current",
+    "doji_current",
+    "goldvn_24h_current",
+    "phu_quy_current",
+    "pnj_current",
+    "vietabank_current"
+  ],
+  "reports": [
+    "coverage_by_year.csv",
+    "missing_dates.csv",
+    "source_reliability.csv",
+    "price_outlier_report.csv",
+    "current_leakage_report.csv"
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "from": "2024-04-12",
+  "to": "2024-04-12",
+  "sources": [
+    "giavang_pnj_archive",
+    "giavang_sjc_archive",
+    "sjc_official_history",
+    "webgia_sjc_archive"
+  ],
+  "generated_at": "2026-07-07T23:39:47.513959",
+  "updated_at": "2026-07-07T23:39:51.472479",
+  "progress": {
+    "webgia_sjc_archive": {
+      "next_index": 1,
+      "total": 1,
+      "rows": 0,
+      "errors": 1
+    },
+    "sjc_official_history": {
+      "next_index": 1,
+      "total": 1,
+      "rows": 0,
+      "errors": 1
+    },
+    "giavang_pnj_archive": {
+      "next_index": 1,
+      "total": 1,
+      "rows": 0,
+      "errors": 1
+    },
+    "giavang_sjc_archive": {
+      "next_index": 1,
+      "total": 1,
+      "rows": 0,
+      "errors": 1
+    }
+  }
+}

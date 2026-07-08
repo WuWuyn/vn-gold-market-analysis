@@ -1,0 +1,36 @@
+{
+  "generated_at": "2026-07-07",
+  "from": "2024-04-12",
+  "to": "2024-04-16",
+  "sources": [
+    {
+      "source": "sjc_official_history",
+      "requested_dates": 5,
+      "rows": 31,
+      "errors": 0,
+      "note": ""
+    },
+    {
+      "source": "webgia_sjc_archive",
+      "requested_dates": 5,
+      "rows": 31,
+      "errors": 0,
+      "note": ""
+    },
+    {
+      "source": "giavang_sjc_archive",
+      "requested_dates": 5,
+      "rows": 8,
+      "errors": 0,
+      "note": ""
+    },
+    {
+      "source": "giavang_pnj_archive",
+      "requested_dates": 5,
+      "rows": 136,
+      "errors": 0,
+      "note": ""
+    }
+  ],
+  "total_rows": 206
+}

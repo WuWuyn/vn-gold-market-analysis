@@ -1,0 +1,36 @@
+{
+  "generated_at": "2026-07-07",
+  "from": "2026-06-01",
+  "to": "2026-06-05",
+  "sources": [
+    {
+      "source": "sjc_official_history",
+      "requested_dates": 5,
+      "rows": 0,
+      "errors": 1,
+      "note": "CollectorHttpError: Request failed for https://sjc.com.vn/GoldPrice/Services/PriceService.ashx: <urlopen error [WinError 10013] An attempt was made to access a socket in a way forbidden by its access permissions>"
+    },
+    {
+      "source": "webgia_sjc_archive",
+      "requested_dates": 5,
+      "rows": 0,
+      "errors": 5,
+      "note": ""
+    },
+    {
+      "source": "giavang_sjc_archive",
+      "requested_dates": 5,
+      "rows": 0,
+      "errors": 5,
+      "note": ""
+    },
+    {
+      "source": "giavang_pnj_archive",
+      "requested_dates": 5,
+      "rows": 0,
+      "errors": 5,
+      "note": ""
+    }
+  ],
+  "total_rows": 0
+}

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import argparse
-import csv
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 try:
     from ._bootstrap import bootstrap
@@ -16,6 +16,12 @@ bootstrap()
 from gold_collectors.full_pipeline import DataLakeWriter
 from gold_collectors.http import CachedHttpClient
 from gold_collectors.reliability import accepted_historical_sources, collect_historical_rows, date_range, read_registry, write_csv
+from gold_collectors.http import CollectorHttpError
+
+try:
+    from tqdm import tqdm as _tqdm
+except Exception:  # pragma: no cover - optional dependency
+    _tqdm = None
 
 
 def parse_args() -> argparse.Namespace:
@@ -28,7 +34,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--format", default="parquet,csv")
     parser.add_argument("--timeout", type=int, default=12)
     parser.add_argument("--retries", type=int, default=0)
+    parser.add_argument("--show-progress", action="store_true", default=True)
     return parser.parse_args()
+
+
+def _progress(items: list[str], description: str, enabled: bool) -> Any:
+    if not enabled or _tqdm is None:
+        return items
+    return _tqdm(items, desc=description, unit="dates")
 
 
 def main() -> int:
@@ -44,19 +57,32 @@ def main() -> int:
 
     rows = []
     leakage_rows = []
-    for requested_date in date_range(args.from_date, args.to_date):
+    dates = date_range(args.from_date, args.to_date)
+    for requested_date in _progress(dates, f"Backfill historical target ({args.from_date} -> {args.to_date})", args.show_progress):
         for source in sorted(allowed_sources):
-            source_rows = collect_historical_rows(source, requested_date, http)
-            rows.extend(source_rows)
-            if not source_rows:
+            try:
+                source_rows = collect_historical_rows(source, requested_date, http)
+                rows.extend(source_rows)
+                if not source_rows:
+                    leakage_rows.append(
+                        {
+                            "requested_date": requested_date,
+                            "source": source,
+                            "issue": "no_accepted_rows",
+                            "note": "No row accepted; either empty or business_date did not match requested_date.",
+                        }
+                    )
+            except Exception as exc:  # noqa: BLE001 - preserve resilient ingest
                 leakage_rows.append(
                     {
                         "requested_date": requested_date,
                         "source": source,
-                        "issue": "no_accepted_rows",
-                        "note": "No row accepted; either empty or business_date did not match requested_date.",
+                        "issue": "request_error",
+                        "note": f"{type(exc).__name__}: {exc}",
                     }
                 )
+                if not isinstance(exc, CollectorHttpError):
+                    raise
 
     writer.write_dataset("domestic_gold_quotes", rows)
     write_csv(out_dir / "reports" / "current_leakage_report.csv", leakage_rows)

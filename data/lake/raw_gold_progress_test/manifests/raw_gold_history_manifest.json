@@ -1,0 +1,70 @@
+{
+  "generated_at": "2026-07-07",
+  "from": "2024-04-12",
+  "to": "2024-04-12",
+  "sources": [
+    "giavang_pnj_archive",
+    "giavang_sjc_archive",
+    "sjc_official_history",
+    "webgia_sjc_archive"
+  ],
+  "checkpoint_file": "data\\lake\\raw_gold_progress_test\\checkpoints\\raw_gold_history_checkpoint.json",
+  "resume_used": true,
+  "status": [
+    {
+      "source": "giavang_pnj_archive",
+      "requested_dates": 1,
+      "rows": 0,
+      "errors": 0,
+      "note": ""
+    },
+    {
+      "source": "giavang_sjc_archive",
+      "requested_dates": 1,
+      "rows": 0,
+      "errors": 0,
+      "note": ""
+    },
+    {
+      "source": "sjc_official_history",
+      "requested_dates": 1,
+      "rows": 0,
+      "errors": 0,
+      "note": "already_completed"
+    },
+    {
+      "source": "webgia_sjc_archive",
+      "requested_dates": 1,
+      "rows": 0,
+      "errors": 0,
+      "note": ""
+    }
+  ],
+  "progress": {
+    "sjc_official_history": {
+      "next_index": 1,
+      "total": 1,
+      "rows": 0,
+      "errors": 1
+    },
+    "webgia_sjc_archive": {
+      "next_index": 1,
+      "total": 1,
+      "rows": 0,
+      "errors": 1
+    },
+    "giavang_sjc_archive": {
+      "next_index": 1,
+      "total": 1,
+      "rows": 0,
+      "errors": 1
+    },
+    "giavang_pnj_archive": {
+      "next_index": 1,
+      "total": 1,
+      "rows": 0,
+      "errors": 1
+    }
+  },
+  "total_rows": 0
+}

@@ -1,0 +1,7 @@
+{
+  "url": "https://sjc.com.vn/GoldPrice/Services/PriceService.ashx",
+  "status": 200,
+  "text": "{\"success\":false,\"message\":\"Chỉ được xem Giá trong khoảng dưới 90 ngày\"}",
+  "raw_payload_hash": "9a30739c06f49bbaa9efcda2339c8ee88ac88a79c4f5c751f79d3661860e0777",
+  "from_cache": false
+}
