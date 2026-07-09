@@ -1,0 +1,565 @@
+#!/usr/bin/env python3
+"""
+Enhanced external features collector (v2).
+
+Uses FRED JSON API (not CSV - CSV endpoint blocked) for:
+- DFII10 US 10Y real TIPS yield
+- T10YIE 10Y breakeven inflation
+- T5YIE 5Y breakeven inflation
+- STLFSI2 St. Louis Financial Stress Index
+- NFCI Chicago Fed National Financial Conditions
+- BAA10Y BAA corporate bond yield
+- AAA10Y AAA corporate bond yield
+- M2SL M2 money supply
+- DGS10, VIXCLS, DTWEXBGS, DCOILWTICO (already in v1, re-fetched for completeness)
+
+Uses yfinance Ticker API (not yf.download) for:
+- GLD SPDR Gold ETF (proxy for financial gold flows)
+- GLD shares outstanding (current snapshot from .info)
+- GC=F COMEX gold front-month continuous
+
+Uses crawl4ai for:
+- LBMA Gold Fix (London spot reference as basis alternative to GC=F)
+
+FRED_API_KEY must be set in .env or environment.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import sys
+import csv
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta
+from pathlib import Path
+from typing import Any
+from urllib import request as _url_request, error as _url_error, parse as _url_parse
+
+try:
+    from ._bootstrap import bootstrap
+except ImportError:
+    from _bootstrap import bootstrap
+
+bootstrap()
+
+from gold_collectors.full_pipeline import DataLakeWriter
+
+# ---------------------------------------------------------------------------
+# FRED series mapping (series_id -> (asset_name, unit))
+# ---------------------------------------------------------------------------
+ENHANCED_FRED_SERIES: dict[str, tuple[str, str]] = {
+    "DGS10": ("us_10y_nominal", "pct"),
+    "DCOILWTICO": ("wti_crude", "usd_barrel"),
+    "VIXCLS": ("vix", "index"),
+    "DTWEXBGS": ("dxy_broad", "index"),
+    "DFII10": ("us_10y_real_tips_yield", "pct"),
+    "T10YIE": ("us_10y_breakeven_inflation", "pct"),
+    "T5YIE": ("us_5y_breakeven_inflation", "pct"),
+    "STLFSI2": ("st_louis_financial_stress", "index"),
+    "NFCI": ("chicago_fed_national_fin_conditions", "index"),
+    "BAA10Y": ("baa_corp_bond_yield", "pct"),
+    "AAA10Y": ("aaa_corp_bond_yield", "pct"),
+    "M2SL": ("m2_money_supply", "billions_usd"),
+    "GLD": ("gld_spdr_gold_etf_close", "usd"),
+}
+
+FRED_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36"
+)
+
+# ---------------------------------------------------------------------------
+# FRED collector via JSON API
+# ---------------------------------------------------------------------------
+def collect_enhanced_fred(start: str, end: str) -> list[dict[str, Any]]:
+    """Fetch all FRED series via official JSON API."""
+    api_key = os.environ.get("FRED_API_KEY", "")
+    if not api_key:
+        print(" FRED: No FRED_API_KEY found, skipping")
+        return []
+
+    rows: list[dict[str, Any]] = []
+
+    for series_id, (asset, unit) in ENHANCED_FRED_SERIES.items():
+        url = (
+            "https://api.stlouisfed.org/fred/series/observations"
+            f"?series_id={series_id}&file_type=json&api_key={api_key}"
+            f"&observation_start={start}&observation_end={end}"
+            "&limit=50000&sort_order=asc"
+        )
+        try:
+            req = _url_request.Request(
+                url,
+                headers={"User-Agent": FRED_USER_AGENT, "Accept": "application/json"},
+            )
+            with _url_request.urlopen(req, timeout=30) as resp:
+                raw = resp.read()
+                payload = json.loads(raw.decode("utf-8", errors="replace"))
+                raw_hash = hashlib.sha256(raw).hexdigest()
+        except _url_error.HTTPError as exc:
+            print(f" FRED {series_id}: HTTP {exc.code} - {exc.reason}")
+            continue
+        except Exception as exc:
+            print(f" FRED {series_id}: {type(exc).__name__}: {exc}")
+            continue
+
+        if "error_message" in payload:
+            print(f" FRED {series_id}: API error - {payload['error_message']}")
+            continue
+
+        obs_count = 0
+        for item in payload.get("observations", []):
+            val = item.get("value", "")
+            if val in ("", ".", None):
+                continue
+            try:
+                value = float(val)
+            except ValueError:
+                continue
+            obs_date = item.get("date", "")
+            if not obs_date:
+                continue
+            rows.append(
+                {
+                    "date": obs_date[:10],
+                    "series_id": series_id,
+                    "asset": asset,
+                    "value": value,
+                    "unit": unit,
+                    "source": "fred_json_v2",
+                    "raw_hash": raw_hash,
+                    "realtime_start": item.get("realtime_start", ""),
+                }
+            )
+            obs_count += 1
+        print(f" FRED {series_id}: {obs_count} observations")
+
+    return rows
+
+# ---------------------------------------------------------------------------
+# yfinance Ticker-based collector (compatible with yfinance >= 0.2)
+# ---------------------------------------------------------------------------
+def _collect_yfinance_ticker(
+    symbol: str, asset_name: str, start: str, end: str
+) -> list[dict[str, Any]]:
+    """Download OHLCV via yfinance Ticker API."""
+    import yfinance as yf  # noqa: delayed import
+
+    rows: list[dict[str, Any]] = []
+    ticker = yf.Ticker(symbol)
+    end_excl = (datetime.strptime(end, "%Y-%m-%d").date() + timedelta(days=1)).isoformat()
+    frame = ticker.history(start=start, end=end_excl, auto_adjust=False, repair=False)
+    if frame.empty:
+        return rows
+
+    for idx, row in frame.iterrows():
+        d = idx.date().isoformat()
+        close_v = row.get("Close")
+        if close_v is None:
+            continue
+        rows.append(
+            {
+                "date": d,
+                "series_id": symbol,
+                "asset": asset_name,
+                "value": round(float(close_v), 4),
+                "open": round(float(row["Open"]), 4) if row.get("Open") is not None else None,
+                "high": round(float(row["High"]), 4) if row.get("High") is not None else None,
+                "low": round(float(row["Low"]), 4) if row.get("Low") is not None else None,
+                "volume": round(float(row["Volume"]), 0) if row.get("Volume") is not None else None,
+                "unit": "usd_per_share",
+                "source": "yfinance_ticker_v2",
+                "note": "no_shares_outstanding",
+            }
+        )
+    return rows
+
+
+def collect_gld_etf(start: str, end: str) -> list[dict[str, Any]]:
+    return _collect_yfinance_ticker("GLD", "gld_spdr_gold_etf", start, end)
+
+
+def collect_gc_futures(start: str, end: str) -> list[dict[str, Any]]:
+    return _collect_yfinance_ticker("GC=F", "gold_futures_front_continuous", start, end)
+
+# ---------------------------------------------------------------------------
+# Gold futures basis (two-leg approximation from yfinance)
+# ---------------------------------------------------------------------------
+def collect_gold_futures_basis(start: str, end: str) -> list[dict[str, Any]]:
+    """Collect GC=F as primary futures proxy. yfinance doesn't expose GC1!/GC2!."""
+    return collect_gc_futures(start, end)
+
+# ---------------------------------------------------------------------------
+# LBMA Gold Fix via crawl4ai (AM fix = London gold spot reference)
+# ---------------------------------------------------------------------------
+def collect_lbma_gold_price() -> list[dict[str, Any]]:
+    """Scrape LBMA Gold Fix prices from lbma.org.uk price history page."""
+    rows: list[dict[str, Any]] = []
+    try:
+        from crawl4ai import AsyncWebCrawler, CacheMode  # noqa: optional
+    except ImportError:
+        print(" LBMA: crawl4ai not installed, skipping")
+        return rows
+
+    async def _crawl():
+        async with AsyncWebCrawler(
+            headless=True, cache_mode=CacheMode.BYPASS
+        ) as crawler:
+            targets = [
+                "https://www.lbma.org.uk/lbma-gold-price-data",
+                "https://www.lbma.org.uk/lbma-gold-price",
+            ]
+            for url in targets:
+                try:
+                    r = await crawler.arun(
+                        url=url,
+                        word_count_threshold=1,
+                        page_timeout=20_000,
+                        js_code="() => { const rows = document.querySelectorAll('table tbody tr'); return Array.from(rows).slice(0,200).map(r => r.innerText).join('\\n'); }",
+                    )
+                    text = r.markdown or ""
+                    raw_hash = hashlib.sha256(text.encode()).hexdigest()
+                    count = 0
+                    for line in text.split("\n"):
+                        # Match dd/mm/yyyy price patterns
+                        m = re.search(r"(\d{1,2}/\d{1,2}/\d{4})\s+(\d{2,4}[.,]\d{2})", line)
+                        if m:
+                            date_str, val = m.group(1), m.group(2)
+                            try:
+                                d = datetime.strptime(date_str, "%d/%m/%Y").date().isoformat()
+                            except ValueError:
+                                continue
+                            try:
+                                v = float(val.replace(",", "."))
+                            except ValueError:
+                                continue
+                            rows.append({
+                                "date": d,
+                                "series_id": "LBMA_GOLD_FIX",
+                                "asset": "lbma_gold_fix_usd_oz",
+                                "value": v,
+                                "unit": "usd_per_oz",
+                                "source": "lbma_crawl4ai",
+                                "raw_hash": raw_hash,
+                            })
+                            count += 1
+                    print(f" LBMA [{url.split('/')[-1]}]: {count} prices from {len(text)} chars")
+                except Exception as exc:
+                    print(f" LBMA error [{url}]: {type(exc).__name__}: {exc}")
+
+    import asyncio
+    asyncio.run(_crawl())
+    return rows
+
+# ---------------------------------------------------------------------------
+# GLD shares outstanding (current snapshot from yfinance.info)
+# ---------------------------------------------------------------------------
+def collect_gld_shares_outstanding() -> list[dict[str, Any]]:
+    """One-row snapshot: GLD total shares outstanding right now."""
+    rows: list[dict[str, Any]] = []
+    try:
+        import yfinance as yf  # noqa: delayed import
+        t = yf.Ticker("GLD")
+        so_val = t.info.get("sharesOutstanding")
+        if so_val and so_val > 0:
+            rows.append({
+                "date": date.today().isoformat(),
+                "series_id": "GLD_SHARES_OUTSTANDING",
+                "asset": "gld_etf_shares_outstanding",
+                "value": float(so_val),
+                "unit": "shares",
+                "source": "yfinance_gld_info",
+                "note": f"SPDR Gold Shares - {so_val/1e6:.1f}M shares; current snapshot only",
+            })
+            print(f" GLD shares outstanding: {so_val/1e6:.1f}M")
+        else:
+            print(" GLD shares outstanding: yfinance returned null/zero")
+    except Exception as exc:
+        print(f" GLD shares outstanding error: {type(exc).__name__}: {exc}")
+    return rows
+
+# ---------------------------------------------------------------------------
+# VN deposit rates (SBV headless JSON API)
+# ---------------------------------------------------------------------------
+_VN_DEPOSIT_CONTENT_STRUCTURE_ID = "137473"  # SBV rates content structure
+
+
+def collect_vietnam_deposit_rates() -> list[dict[str, Any]]:
+    """Fetch SBV deposit rate announcements via headless delivery JSON API.
+
+    Same pattern as collect_sbv_central_fx_history - the SBV CMS exposes
+    rate announcements as structured content items. We pull the latest N
+    items and parse any rate figures from the content fields.
+    """
+    rows: list[dict[str, Any]] = []
+    url = (
+        f"https://www.sbv.gov.vn/vi/o/headless-delivery/v1.0/content-structures/"
+        f"{_VN_DEPOSIT_CONTENT_STRUCTURE_ID}/structured-contents"
+        f"?pageSize=50&sort=datePublished:desc"
+    )
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36"
+        ),
+        "Accept": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+    }
+    try:
+        req = _url_request.Request(url, headers=headers)
+        with _url_request.urlopen(req, timeout=20) as resp:
+            raw = resp.read()
+            payload = json.loads(raw.decode("utf-8", errors="replace"))
+            raw_hash = hashlib.sha256(raw).hexdigest()
+    except Exception as exc:
+        print(f" SBV deposit rates API: {type(exc).__name__}: {exc}")
+        return rows
+
+    items = payload.get("items", [])
+    if not items:
+        print(" SBV deposit rates API: empty response")
+        return rows
+
+    print(f" SBV deposit rates API: {len(items)} items")
+
+    for item in items:
+        fields: dict[str, str] = {}
+        for field in item.get("contentFields", []):
+            value = field.get("contentFieldValue") or {}
+            fields[field.get("name", "")] = value.get("data", "")
+        pub_date = item.get("datePublished", "")[:10]
+        if not pub_date:
+            continue
+
+        # Try to parse common rate fields
+        rate_value = _parse_sbv_rate_text(fields)
+        doc_number = fields.get("SoVanBan") or fields.get("SoVanBanThongBao") or ""
+
+        rows.append(
+            {
+                "date": pub_date,
+                "source": "sbv_deposit_rates_json",
+                "series_id": "SBV_DEPOSIT_RATES",
+                "asset": "vn_deposit_rates",
+                "value": rate_value,
+                "unit": "pct",
+                "document_number": doc_number,
+                "published_at": item.get("datePublished"),
+                "raw_hash": raw_hash,
+                "note": "parsed_from_content_fields",
+            }
+        )
+
+    # Deduplicate by date
+    seen = set()
+    unique = []
+    for r in rows:
+        key = (r["date"], r.get("document_number", ""))
+        if key not in seen:
+            seen.add(key)
+            unique.append(r)
+
+    print(f" SBV deposit rates: {len(unique)} unique entries")
+    return unique
+
+
+def _parse_sbv_rate_text(fields: dict[str, str]) -> float | None:
+    """Extract a representative rate from SBV content fields.
+
+    Tries common field names for deposit/refinance/discount rates.
+    Falls back to scanning all values for decimal numbers that look like %.
+    """
+    # Priority: direct rate fields (field names vary across publications)
+    candidates = []
+    for name, value in fields.items():
+        if not value:
+            continue
+        name_lower = name.lower()
+        if any(kw in name_lower for kw in ["laisuat", "lai_suat", "rate", "ty_le", "tyle"]):
+            try:
+                v = float(str(value).replace(",", ".").replace("%", "").strip())
+                candidates.append(v)
+            except (ValueError, TypeError):
+                pass
+
+    if candidates:
+        # Return median to avoid outliers
+        candidates.sort()
+        mid = len(candidates) // 2
+        return candidates[mid] if len(candidates) % 2 == 1 else (candidates[mid - 1] + candidates[mid]) / 2
+
+    # Fallback: scan all text for % patterns
+    for value in fields.values():
+        text = str(value)
+        m = re.search(r"(\d{1,2}[.,]\d{1,2})\s*%", text)
+        if m:
+            try:
+                return float(m.group(1).replace(",", "."))
+            except ValueError:
+                pass
+
+    return None
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+@dataclass(frozen=True)
+class FeatureStatus:
+    source: str
+    dataset: str
+    status: str
+    records: int
+    warning: str = ""
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Collect enhanced external features v2.")
+    parser.add_argument("--from", dest="from_date", default="2010-01-01")
+    parser.add_argument("--to", dest="to_date", default=date.today().isoformat())
+    parser.add_argument("--out-dir", default="data/lake/external_features_v2")
+    parser.add_argument("--format", default="csv")
+    parser.add_argument("--timeout", type=int, default=30)
+    parser.add_argument("--retries", type=int, default=1)
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+    out_dir = Path(args.out_dir)
+    norm = out_dir / "normalized"
+    norm.mkdir(parents=True, exist_ok=True)
+    writer = DataLakeWriter(out_dir, formats=[f.strip().lower() for f in args.format.split(",") if f.strip()])
+
+    datasets: dict[str, list[dict]] = {
+        "macro_enhanced": [],
+        "futures_basis": [],
+        "etf_proxy": [],
+        "lbma_spot": [],
+        "gld_shares": [],
+        "vn_deposit_rates": [],
+    }
+    statuses: list[FeatureStatus] = []
+
+    # 1. Enhanced FRED via JSON API
+    try:
+        fred_rows = collect_enhanced_fred(args.from_date, args.to_date)
+        datasets["macro_enhanced"].extend(fred_rows)
+        statuses.append(
+            FeatureStatus("fred_json_v2", "macro_enhanced", "ok", len(fred_rows))
+        )
+    except Exception as exc:
+        statuses.append(
+            FeatureStatus("fred_json_v2", "macro_enhanced", "error", 0, str(exc))
+        )
+    print(f"FRED enhanced error: {exc}")
+
+    # 2. Gold futures basis
+    try:
+        fut_rows = collect_gold_futures_basis(args.from_date, args.to_date)
+        datasets["futures_basis"].extend(fut_rows)
+        statuses.append(
+            FeatureStatus("yfinance_gc_ticker", "futures_basis", "ok", len(fut_rows))
+        )
+        print(f"Futures basis: {len(fut_rows)} rows")
+    except Exception as exc:
+        statuses.append(
+            FeatureStatus("yfinance_gc_ticker", "futures_basis", "error", 0, str(exc))
+        )
+        print(f"Futures basis error: {exc}")
+
+    # 3. GLD ETF proxy
+    try:
+        gld_rows = collect_gld_etf(args.from_date, args.to_date)
+        datasets["etf_proxy"].extend(gld_rows)
+        statuses.append(
+            FeatureStatus("yfinance_gld_ticker", "etf_proxy", "ok", len(gld_rows))
+        )
+        print(f"GLD ETF: {len(gld_rows)} rows")
+    except Exception as exc:
+        statuses.append(
+            FeatureStatus("yfinance_gld_ticker", "etf_proxy", "error", 0, str(exc))
+        )
+        print(f"GLD ETF error: {exc}")
+
+    # 3b. LBMA gold spot (London AM fix)
+    try:
+        lbma_rows = collect_lbma_gold_price()
+        datasets["lbma_spot"].extend(lbma_rows)
+        statuses.append(
+            FeatureStatus("lbma_crawl4ai", "lbma_spot", "ok" if lbma_rows else "empty", len(lbma_rows))
+        )
+        print(f"LBMA gold fix: {len(lbma_rows)} rows")
+    except Exception as exc:
+        statuses.append(
+            FeatureStatus("lbma_crawl4ai", "lbma_spot", "error", 0, str(exc))
+        )
+        print(f"LBMA gold fix error: {exc}")
+
+    # 3c. GLD shares outstanding (current snapshot)
+    try:
+        shares_rows = collect_gld_shares_outstanding()
+        datasets["gld_shares"].extend(shares_rows)
+        statuses.append(
+            FeatureStatus("yfinance_gld_info", "gld_shares", "ok" if shares_rows else "empty", len(shares_rows))
+        )
+        print(f"GLD shares outstanding: {len(shares_rows)} rows")
+    except Exception as exc:
+        statuses.append(
+            FeatureStatus("yfinance_gld_info", "gld_shares", "error", 0, str(exc))
+        )
+        print(f"GLD shares outstanding error: {exc}")
+
+    # 4. VN deposit rates
+    try:
+        dep_rows = collect_vietnam_deposit_rates()
+        datasets["vn_deposit_rates"].extend(dep_rows)
+        statuses.append(
+            FeatureStatus(
+                "vn_deposit_crawl",
+                "vn_deposit_rates",
+                "ok" if dep_rows else "empty",
+                len(dep_rows),
+            )
+        )
+        print(f"VN deposit rates: {len(dep_rows)} rows")
+    except Exception as exc:
+        statuses.append(
+            FeatureStatus(
+                "vn_deposit_crawl", "vn_deposit_rates", "error", 0, str(exc)
+            )
+        )
+        print(f"VN deposit rates error: {exc}")
+
+    # Write all datasets
+    for dataset, rows in datasets.items():
+        writer.write_dataset(dataset, rows)
+
+    manifest = {
+        "generated_at": date.today().isoformat(),
+        "from": args.from_date,
+        "to": args.to_date,
+        "statuses": [
+            {
+                "source": s.source,
+                "dataset": s.dataset,
+                "status": s.status,
+                "records": s.records,
+                "warning": s.warning,
+            }
+            for s in statuses
+        ],
+        "total_records": sum(s.records for s in statuses),
+    }
+    (out_dir / "manifests" / "enhanced_features_manifest.json").write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    print(f"\nDone. Total records: {manifest['total_records']}")
+    print(f"Output: {out_dir}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

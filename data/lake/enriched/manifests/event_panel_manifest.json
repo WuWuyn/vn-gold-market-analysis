@@ -1,0 +1,24 @@
+{
+  "generated_at": "2026-07-09",
+  "from": "2010-01-01",
+  "to": "2027-12-31",
+  "records": 309,
+  "event_types": [
+    "banking_stress",
+    "eurozone_crisis",
+    "financial_crisis",
+    "financial_stress",
+    "geopolitical_crisis",
+    "policy_auction",
+    "policy_import",
+    "policy_inspection",
+    "policy_rate_increase",
+    "tet_proximity",
+    "than_tai"
+  ],
+  "severity_breakdown": {
+    "high": 139,
+    "medium": 89,
+    "low": 81
+  }
+}

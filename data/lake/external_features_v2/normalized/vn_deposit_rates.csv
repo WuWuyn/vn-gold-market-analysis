@@ -1,0 +1,3 @@
+asset,date,note,page_chars,raw_hash,series_id,source,unit,value
+vn_deposit_rates,2026-07-09,raw_page_crawled_needs_extraction,301,88c88ca22b3f11a661819429e7b37893adc146de009bf0be1d263519cd4aec0d,SBV_DEPOSIT_RATES,sbv_deposit_rates,pct,
+vn_deposit_rates,2026-07-09,raw_page_crawled_needs_extraction,0,e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855,VCB_DEPOSIT_RATES,vcb_deposit_rates,pct,
