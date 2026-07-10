@@ -30,6 +30,12 @@ Thumbs.db
 *.sqlite
 *.db
 
+# Data lake — write-only artifacts, do not track
+data/lake/**/manifests/
+data/lake/**/reports/
+data/lake/**/checkpoints/
+data/lake/**/raw/
+
 # Keep small committed examples/documentation under data if needed.
 !data/
 !data/README.md

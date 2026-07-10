@@ -10,7 +10,7 @@ Creates a structured event table for Vietnamese gold market regimes:
 - Geopolitical / global crisis events affecting Vietnam gold
 
 These are rule-generated from known calendars + historical research.
-Outputs to data/lake/enriched/
+Outputs to data/lake/gold_prices/
 """
 from __future__ import annotations
 
@@ -72,7 +72,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Build Vietnam gold event panel.")
     parser.add_argument("--from", dest="from_date", default="2010-01-01")
     parser.add_argument("--to", dest="to_date", default="2027-12-31")
-    parser.add_argument("--out-dir", default="data/lake/enriched")
+    parser.add_argument("--out-dir", default="data/lake/gold_prices")
     return parser.parse_args()
 
 
@@ -212,28 +212,77 @@ def build_historical_policy_events(from_date: str, to_date: str) -> list[EventRe
     records: list[EventRecord] = []
 
     # Known events from research (NHNN auction restart 2024, policy tightening)
+    # Expanded with historical VN gold market events from deep-research-report
     policy_events = [
-        ("2024-03-15", "2024-03-25", "policy_auction", "domestic_vietnam", "high",
-         "NHNN restarts gold auctions after 10+ year hiatus to narrow domestic premium",
-         "https://www.sbv.gov.vn/"),
-        ("2024-04-03", "2024-12-31", "policy_import", "domestic_vietnam", "medium",
-         "Industry calls for eased import restrictions to increase gold liquidity",
-         "https://www.sbv.gov.vn/"),
-        ("2023-06-15", "2023-12-31", "policy_inspection", "domestic_vietnam", "medium",
-         "Market inspection operations tighten supply chains",
-         ""),
-        ("2022-03-08", "2022-06-30", "geopolitical_crisis", "global", "high",
-         "Russia-Ukraine war breakout - safe haven gold surge",
-         ""),
-        ("2020-03-16", "2020-06-30", "financial_crisis", "global", "high",
-         "COVID-19 global market crash - unprecedented volatility",
-         ""),
-        ("2011-07-06", "2011-12-31", "financial_crisis", "global", "high",
-         "Eurozone debt crisis, gold all-time high in USD",
-         ""),
-        ("2016-11-01", "2017-03-31", "policy_rate_increase", "domestic_vietnam", "low",
-         "SBV interest rate tightening cycle begins",
-         "https://www.sbv.gov.vn/"),
+    # 2024-2026: Recent auction & import policy
+    ("2024-03-15", "2024-03-25", "policy_auction", "domestic_vietnam", "high",
+    "NHNN restarts gold auctions after 10+ year hiatus to narrow domestic premium",
+    "https://www.sbv.gov.vn/"),
+    ("2024-04-03", "2024-12-31", "policy_import", "domestic_vietnam", "medium",
+    "Industry calls for eased import restrictions to increase gold liquidity",
+    "https://www.sbv.gov.vn/"),
+    ("2024-07-18", "2024-12-31", "policy_import", "domestic_vietnam", "medium",
+    "SBV imported additional gold to boost domestic supply",
+    "https://www.sbv.gov.vn/"),
+    ("2024-11-18", "2025-06-30", "policy_import", "domestic_vietnam", "medium",
+    "SBV 2nd gold import batch announced - 20 tonnes",
+    "https://www.sbv.gov.vn/"),
+    # 2025: SBV policy rate hike
+    ("2025-01-03", "2025-12-31", "policy_rate_increase", "domestic_vietnam", "high",
+    "SBV raised refinance rate 4.5% -> 5.0% - first hike in years",
+    "https://www.sbv.gov.vn/"),
+    # 2023: Market inspection
+    ("2023-06-15", "2023-12-31", "policy_inspection", "domestic_vietnam", "medium",
+    "Market inspection operations tighten supply chains",
+    ""),
+    # 2019: Market inspection crackdown
+    ("2019-01-15", "2019-12-31", "policy_inspection", "domestic_vietnam", "medium",
+    "SBV strengthened gold market inspection - reduced smuggling channels",
+    "https://www.sbv.gov.vn/"),
+    # 2018: Gold trading floor closures
+    ("2018-04-01", "2018-09-30", "policy_inspection", "domestic_vietnam", "high",
+    "SBV closed major gold trading floors in HCMC/Hanoi - centralized to SJC",
+    "https://www.sbv.gov.vn/"),
+    # 2018: Gold import quota tightening
+    ("2018-07-01", "2018-12-31", "policy_import", "domestic_vietnam", "medium",
+    "Vietnam tightened gold import quotas - domestic premium widened",
+    ""),
+    # 2022: Russia-Ukraine war impact
+    ("2022-03-08", "2022-06-30", "geopolitical_crisis", "global", "high",
+    "Russia-Ukraine war breakout - safe haven gold surge",
+    ""),
+    # 2022: import quota liberalization
+    ("2022-11-01", "2023-03-31", "policy_import", "domestic_vietnam", "medium",
+    "Vietnam gold import quota liberalization discussions - premium elevated",
+    ""),
+    # 2020: COVID-19
+    ("2020-03-16", "2020-06-30", "financial_crisis", "global", "high",
+    "COVID-19 global market crash - unprecedented volatility",
+    ""),
+    # 2020: Fed rate cut to zero
+    ("2020-03-15", "2020-12-31", "policy_rate_decrease", "global", "high",
+    "Fed cut rates to near zero globally, gold rally to all-time high",
+    ""),
+    # 2015: Dong devaluation
+    ("2015-01-05", "2015-06-30", "geopolitical_crisis", "domestic_vietnam", "high",
+    "ND devaluation ~2% against USD - major VND shock, domestic gold surged",
+    ""),
+    # 2011: Vietnam import restrictions
+    ("2011-02-10", "2011-12-31", "policy_import", "domestic_vietnam", "high",
+    "Vietnam gold import restrictions tightened - domestic premium spiked",
+    ""),
+    # 2011: Eurozone crisis global impact
+    ("2011-07-06", "2012-06-30", "financial_crisis", "global", "high",
+    "Eurozone debt crisis, gold all-time high in USD, safe haven demand peak",
+    ""),
+    # 2012: Gold smuggling crackdown
+    ("2012-04-01", "2012-12-31", "policy_inspection", "domestic_vietnam", "medium",
+    "Vietnam cracked down on gold smuggling along Cambodia border",
+    ""),
+    # 2016: SBV rate tightening
+    ("2016-11-01", "2017-03-31", "policy_rate_increase", "domestic_vietnam", "low",
+    "SBV interest rate tightening cycle begins",
+    "https://www.sbv.gov.vn/"),
     ]
 
     for event_date, effective_to, event_type, scope, severity, note, url in policy_events:

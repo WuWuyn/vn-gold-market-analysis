@@ -45,9 +45,9 @@ ELIGIBLE_SOURCES = {
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Integrate archive sources into audited domestic gold quotes.")
-    p.add_argument("--raw-dir", default="data/lake/raw_gold_15y_full")
-    p.add_argument("--audited-dir", default="data/lake/audited")
-    p.add_argument("--out-dir", default="data/lake/audited")
+    p.add_argument("--raw-dir", default="data/lake/raw_gold_15y")
+    p.add_argument("--audited-dir", default="data/lake/domestic_target")
+    p.add_argument("--out-dir", default="data/lake/domestic_target")
     return p.parse_args()
 
 

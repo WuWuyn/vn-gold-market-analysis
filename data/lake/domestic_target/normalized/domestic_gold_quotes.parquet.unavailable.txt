@@ -1,0 +1,2 @@
+Parquet write skipped: No module named 'pandas'
+CSV fallback is available.

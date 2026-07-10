@@ -30,7 +30,7 @@ def _progress(items, description: str, enabled: bool):
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate quality reports for audited gold data collection.")
-    parser.add_argument("--data-lake", default="data_lake_audited")
+    parser.add_argument("--data-lake", default="data/lake/domestic_target")
     parser.add_argument("--registry", default="configs/source_registry_audited.yaml")
     parser.add_argument("--from", dest="from_date", default="2011-07-06")
     parser.add_argument("--to", dest="to_date", default="2026-07-06")

@@ -29,7 +29,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--from", dest="from_date", default="2011-07-06")
     parser.add_argument("--to", dest="to_date", default="2026-07-06")
     parser.add_argument("--registry", default="configs/source_registry_audited.yaml")
-    parser.add_argument("--out-dir", default="data_lake_audited")
+    parser.add_argument("--out-dir", default="data/lake/domestic_target")
     parser.add_argument("--cache-dir", default=None)
     parser.add_argument("--format", default="parquet,csv")
     parser.add_argument("--timeout", type=int, default=12)

@@ -656,27 +656,38 @@ def collect_optional_vnstock_features(start: str, end: str) -> list[dict[str, An
         from vnstock import Quote  # type: ignore
     except Exception:
         return []
-    try:
-        frame = Quote(symbol="VNINDEX", source="VCI").history(start=start, end=end)
-    except Exception:
-        return []
-    rows = []
-    for _, row in frame.iterrows():
-        row_date = str(row.get("time") or row.get("date") or "")[:10]
-        close = row.get("close")
-        if not row_date or close is None:
+    _INDEX_SYMBOLS: list[tuple[str, str]] = [
+        ("VNINDEX",  "vnindex"),
+        ("VN30",     "vn30"),
+        ("HNXINDEX", "hnxindex"),
+    ]
+    rows: list[dict[str, Any]] = []
+    for symbol, asset_name in _INDEX_SYMBOLS:
+        try:
+            frame = Quote(symbol=symbol, source="VCI").history(start=start, end=end)
+        except Exception as exc:
+            print(f"  WARN vnstock {symbol}: {type(exc).__name__}: {exc}")
             continue
-        rows.append(
-            {
-                "date": row_date,
-                "series_id": "VNINDEX",
-                "asset": "vnindex",
-                "value": float(close),
-                "unit": "index",
-                "source": "vnstock_vci",
-                "raw_hash": hashlib.sha256(f"VNINDEX:VCI:{start}:{end}".encode("utf-8")).hexdigest(),
-            }
-        )
+        if frame is None or frame.empty:
+            continue
+        for _, row in frame.iterrows():
+            row_date = str(row.get("time") or row.get("date") or "")[:10]
+            close = row.get("close")
+            if not row_date or close is None:
+                continue
+            rows.append(
+                {
+                    "date": row_date,
+                    "series_id": symbol,
+                    "asset": asset_name,
+                    "value": float(close),
+                    "unit": "index",
+                    "source": "vnstock_vci",
+                    "raw_hash": hashlib.sha256(
+                        f"{symbol}:VCI:{start}:{end}".encode("utf-8")
+                    ).hexdigest(),
+                }
+            )
     return rows
 
 

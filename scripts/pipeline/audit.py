@@ -20,10 +20,10 @@ from pathlib import Path
 # ── paths ────────────────────────────────────────────────────────────────────
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _ROOT = _SCRIPT_DIR.parent.parent
-_V1 = _ROOT / "data" / "lake" / "external_features" / "normalized"
-_V2 = _ROOT / "data" / "lake" / "external_features_v2" / "normalized"
-_ENR = _ROOT / "data" / "lake" / "enriched" / "normalized"
-_AUD = _ROOT / "data" / "lake" / "audited" / "normalized"
+_V1 = _ROOT / "data" / "lake" / "market_data" / "v1" / "normalized"
+_V2 = _ROOT / "data" / "lake" / "market_data" / "v2" / "normalized"
+_ENR = _ROOT / "data" / "lake" / "gold_prices"
+_AUD = _ROOT / "data" / "lake" / "domestic_target" / "normalized"
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────

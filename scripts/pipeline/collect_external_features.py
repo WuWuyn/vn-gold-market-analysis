@@ -45,7 +45,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Collect external feature sources aligned by date.")
     parser.add_argument("--from", dest="from_date", default="2011-07-06")
     parser.add_argument("--to", dest="to_date", default="2026-07-06")
-    parser.add_argument("--out-dir", default="data_lake_external_features")
+    parser.add_argument("--out-dir", default="data/lake/market_data/v1")
     parser.add_argument("--format", default="parquet,csv")
     parser.add_argument("--timeout", type=int, default=12)
     parser.add_argument("--retries", type=int, default=0)

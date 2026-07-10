@@ -81,7 +81,7 @@ def merge_and_write(existing: list[dict], new_rows: list[dict], out_path: Path):
 
 def main():
     start, end = "2010-01-01", "2026-07-07"
-    out_dir = Path("data/lake/external_features_v2")
+    out_dir = Path("data/lake/market_data/v2")
     norm = out_dir / "normalized"
     norm.mkdir(parents=True, exist_ok=True)
     writer = DataLakeWriter(out_dir, formats=["csv"])

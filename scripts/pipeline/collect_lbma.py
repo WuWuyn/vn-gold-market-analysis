@@ -8,7 +8,7 @@ No auth required. Returns AM + PM fix prices in USD/GBP/EUR.
 Limitation: only TODAY's data is available (not historical archive).
 This collector should be run daily to build a time series.
 
-Output: data/lake/external_features_v2/normalized/lbma_spot.csv
+Output: data/lake/market_data/v2/normalized/lbma_spot.csv
 """
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ bootstrap()
 from gold_collectors.full_pipeline import DataLakeWriter  # noqa: E402
 
 LBMA_TODAY_URL = "https://prices.lbma.org.uk/json/today.json"
-OUT_DIR = Path("data/lake/external_features_v2")
+OUT_DIR = Path("data/lake/market_data/v2")
 NORMALIZED = OUT_DIR / "normalized"
 NORMALIZED.mkdir(parents=True, exist_ok=True)
 
