@@ -1,7 +1,0 @@
-{
-  "url": "https://sjc.com.vn/GoldPrice/Services/PriceService.ashx",
-  "status": 200,
-  "text": "{\"success\":true,\"data\":[{\"Id\":0,\"TypeName\":\"Vàng SJC 1L, 10L, 1KG\",\"BranchName\":\"Hồ Chí Minh\",\"Buy\":\"37,000\",\"BuyValue\":37000000.0000,\"Sell\":\"37,200\",\"SellValue\":37200000.0000,\"BuyDiffer\":null,\"BuyDifferValue\":0,\"SellDiffer\":null,\"SellDifferValue\":0,\"GroupDate\":\"\\/Date(1559926800000)\\/\"},{\"Id\":0,\"TypeName\":\"Vàng SJC 1L, 10L, 1KG\",\"BranchName\":\"Hồ Chí Minh\",\"Buy\":\"37,050\",\"BuyValue\":37050000.0000,\"Sell\":\"37,350\",\"SellValue\":37350000.0000,\"BuyDiffer\":null,\"BuyDifferValue\":0,\"SellDiffer\":null,\"SellDifferValue\":0,\"GroupDate\":\"\\/Date(1559931868000)\\/\"},{\"Id\":0,\"TypeName\":\"Vàng SJC 1L, 10L, 1KG\",\"BranchName\":\"Hồ Chí Minh\",\"Buy\":\"37,100\",\"BuyValue\":37100000.0000,\"Sell\":\"37,400\",\"SellValue\":37400000.0000,\"BuyDiffer\":null,\"BuyDifferValue\":0,\"SellDiffer\":null,\"SellDifferValue\":0,\"GroupDate\":\"\\/Date(1559933588000)\\/\"},{\"Id\":0,\"TypeName\":\"Vàng SJC 1L, 10L, 1KG\",\"BranchName\":\"Hồ Chí Minh\",\"Buy\":\"37,150\",\"BuyValue\":37150000.0000,\"Sell\":\"37,450\",\"SellValue\":37450000.0000,\"BuyDiffer\":null,\"BuyDifferValue\":0,\"SellDiffer\":null,\"SellDifferValue\":0,\"GroupDate\":\"\\/Date(1559937365000)\\/\"}]}",
-  "raw_payload_hash": "568892572987cb46182f62b0e8959a97cd7ba5895dcb90698f0625320df1417e",
-  "from_cache": false
-}

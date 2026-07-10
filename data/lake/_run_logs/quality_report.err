@@ -1,5 +1,0 @@
-coverage_by_year:   0%|          | 0/16 [00:00<?, ?items/s]coverage_by_year: 100%|##########| 16/16 [00:00<00:00, 439.06items/s]
-missing_dates:   0%|          | 0/5481 [00:00<?, ?items/s]missing_dates: 100%|##########| 5481/5481 [00:00<00:00, 3222001.43items/s]
-collect_price_values:   0%|          | 0/28220 [00:00<?, ?items/s]collect_price_values: 100%|##########| 28220/28220 [00:00<00:00, 2893118.37items/s]
-detect_outliers:   0%|          | 0/28220 [00:00<?, ?items/s]detect_outliers: 100%|##########| 28220/28220 [00:00<00:00, 2762011.92items/s]
-detect_business_date_leakage:   0%|          | 0/28220 [00:00<?, ?items/s]detect_business_date_leakage: 100%|##########| 28220/28220 [00:00<00:00, 3156774.47items/s]

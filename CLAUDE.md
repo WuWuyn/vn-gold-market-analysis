@@ -34,11 +34,12 @@ for agentic crawls. Optional FRED API key if not using CSV windowed download.
 
 | Path | Role | Git-tracked |
 |---|---|---|
-| `data/lake/raw_gold_15y_full/` | Raw gold crawl 2010–2026, all sources | Yes — commit separately |
-| `data/lake/external_features/` | SBV FX, yfinance, FRED, WB, GSO, vnstock | Yes — commit separately |
-| `data/lake/audited/` | Historical-valid-only domestic gold target | Yes — commit separately |
-| `data/lake/enriched/` | Premium decomposition, event panel, futures basis | No |
-| `data/lake/external_features_v2/` | Enhanced FRED series, futures basis, ETF proxy | No |
+| `data/lake/raw_gold_15y/` | Raw gold crawl 2010–2026, all sources | Yes — commit separately |
+| `data/lake/market_data/v1/` | SBV FX, yfinance, FRED, WB, GSO, vnstock | Yes — commit separately |
+| `data/lake/domestic_target/` | Historical-valid-only domestic gold target | Yes — commit separately |
+| `data/lake/gold_prices/` | Premium decomposition, event panel, enriched gold | No |
+| `data/lake/market_data/v1/` | FX, global series, macro v1 (FRED, WB) | No |
+| `data/lake/market_data/v2/` | Enhanced FRED, futures, ETF, VN rates, events | No |
 | `data/lake/raw_gold_15y_partial*` | Test runs — safe to delete | No |
 | `data/lake/raw_gold_15y_smoke*` | Smoke tests — deleted (2026-07-09) | No |
 | `data/lake/raw_gold_15y_sjc_only/` | SJC-only crawl — kept for reference | No |
@@ -53,31 +54,31 @@ python scripts/pipeline/source_audit.py --out-dir data/experiments/audit_output
 python scripts/pipeline/build_source_registry.py --audit-json data/experiments/audit_output/source_audit.json
 
 # 2. Backfill domestic target (historical-valid sources only)
-python scripts/pipeline/backfill_target.py --from 2011-07-06 --to 2026-07-06 --out-dir data/lake/audited
+python scripts/pipeline/backfill_target.py --from 2011-07-06 --to 2026-07-06 --out-dir data/lake/domestic_target
 
 # 3. Raw full crawl with resume
-python scripts/pipeline/crawl_raw_gold_history.py --from 2010-01-01 --to 2026-07-07 --out-dir data/lake/raw_gold_15y_full --resume
+python scripts/pipeline/crawl_raw_gold_history.py --from 2010-01-01 --to 2026-07-07 --out-dir data/lake/raw_gold_15y --resume
 
 # 4. External features
-python scripts/pipeline/collect_external_features.py --from 2011-07-06 --to 2026-07-07 --out-dir data/lake/external_features
+python scripts/pipeline/collect_external_features.py --from 2011-07-06 --to 2026-07-07 --out-dir data/lake/market_data/v1
 
 # 5. Quality reports
-python scripts/pipeline/quality_report.py --data-lake data/lake/audited --from 2011-07-06 --to 2026-07-06
+python scripts/pipeline/quality_report.py --data-lake data/lake/domestic_target --from 2011-07-06 --to 2026-07-06
 
 # 6. Enhanced features (FRED expanded + futures basis + GLD + VN rates)
-python scripts/pipeline/collect_enhanced_features.py --from 2010-01-01 --to 2026-07-07 --out-dir data/lake/external_features_v2
+python scripts/pipeline/collect_enhanced_features.py --from 2010-01-01 --to 2026-07-07 --out-dir data/lake/market_data/v2
 
 # 7. Premium decomposition
-python scripts/pipeline/build_premium_decomposition.py --audited-dir data/lake/audited --external-dir data/lake/external_features --out-dir data/lake/enriched
+python scripts/pipeline/build_premium_decomposition.py --audited-dir data/lake/domestic_target --external-dir data/lake/market_data/v1 --out-dir data/lake/gold_prices
 
 # 8. Event panel (Tết, Thần Tài, policy events, crisis windows)
-python scripts/pipeline/build_event_panel.py --from 2010-01-01 --to 2027-12-31 --out-dir data/lake/enriched
+python scripts/pipeline/build_event_panel.py --from 2010-01-01 --to 2027-12-31 --out-dir data/lake/gold_prices
 ```
 
 ## Current inventory (verified 2026-07-09)
 
 ### Gold domestic
-- `raw_gold_15y_full`: 2010-01-01 → 2026-07-07, sources: sjc_official, pnj, giavang_sjc, webgia_sjc. PNJ alone = 94k rows. Resume-complete.
+- `raw_gold_15y/`: 2010-01-01 → 2026-07-07, sources: sjc_official, pnj, giavang_sjc, webgia_sjc. PNJ alone = 94k rows. Resume-complete.
 - `audited/normalized/domestic_gold_quotes.csv`: 28k rows, 1 source (sjc_official_history).
 
 ### External features

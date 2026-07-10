@@ -1,7 +1,0 @@
-{
-  "url": "https://sjc.com.vn/GoldPrice/Services/PriceService.ashx",
-  "status": 200,
-  "text": "{\"success\":true,\"data\":[{\"Id\":0,\"TypeName\":\"Vàng SJC 1L, 10L, 1KG\",\"BranchName\":\"Hồ Chí Minh\",\"Buy\":\"36,650\",\"BuyValue\":36650000.0000,\"Sell\":\"36,770\",\"SellValue\":36770000.0000,\"BuyDiffer\":null,\"BuyDifferValue\":0,\"SellDiffer\":null,\"SellDifferValue\":0,\"GroupDate\":\"\\/Date(1406048400000)\\/\"},{\"Id\":0,\"TypeName\":\"Vàng SJC 1L, 10L, 1KG\",\"BranchName\":\"Hồ Chí Minh\",\"Buy\":\"36,650\",\"BuyValue\":36650000.0000,\"Sell\":\"36,770\",\"SellValue\":36770000.0000,\"BuyDiffer\":null,\"BuyDifferValue\":0,\"SellDiffer\":null,\"SellDifferValue\":0,\"GroupDate\":\"\\/Date(1406052522000)\\/\"}]}",
-  "raw_payload_hash": "81d1c299fee13458ea3315666a2cefcd59e8bebac25ca0a5bcc435708f9072c3",
-  "from_cache": false
-}
