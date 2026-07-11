@@ -68,10 +68,10 @@ from gold_collectors.full_pipeline import DataLakeWriter  # noqa: E402
 ROOT = Path(__file__).resolve().parents[2]  # project root
 LAKE = ROOT / "data" / "lake"
 ENRICHED = LAKE / "enriched"
-RAW_GOLD = LAKE / "raw_gold_15y_full" / "normalized"
-AUDITED = LAKE / "audited" / "normalized"
-EXT = LAKE / "external_features" / "normalized"
-EXT_V2 = LAKE / "external_features_v2"
+RAW_GOLD = LAKE / "raw_gold_15y" / "normalized"
+AUDITED = LAKE / "domestic_target" / "normalized"
+EXT = LAKE / "market_data" / "v1" / "normalized"
+EXT_V2 = LAKE / "market_data" / "v2" / "normalized"
 OUT = ENRICHED / "master"
 
 CHI_PER_OZ = 31.1034768 / 1.205  # 1 troy oz in chi
@@ -506,7 +506,7 @@ def build_global_reference_daily() -> list[dict[str, Any]]:
 
     #     # LBMA: load CSV if present, index by date (AM fix)
     lbma_idx: dict[str, float] = {}
-    lbma_csv_path = EXT_V2 / "normalized/lbma_spot.csv"
+    lbma_csv_path = EXT_V2 / "lbma_spot.csv"
     if lbma_csv_path.exists():
         for r in _load_csv(lbma_csv_path):
             d = _iso_date(r.get("date", ""))
@@ -516,6 +516,21 @@ def build_global_reference_daily() -> list[dict[str, Any]]:
                 if d and val is not None:
                     lbma_idx[d] = val
         print(f" LBMA index: {len(lbma_idx)} dates loaded from CSV")
+
+    if len(lbma_idx) < 20:
+        lbma_proxy_path = EXT_V2 / "lbma_proxy.csv"
+        if lbma_proxy_path.exists() and lbma_proxy_path.stat().st_size > 100:
+            for r in _load_csv(lbma_proxy_path):
+                d_p = _iso_date(r.get("date", ""))
+                v_p = _safe_float(r.get("value"))
+                if d_p and v_p is not None:
+                    lbma_idx[d_p] = v_p
+            print(f" LBMA index: {len(lbma_idx)} dates (spot + proxy fallback)")
+        else:
+            print(f" LBMA proxy missing or empty ({len(lbma_idx)} dates)")
+    else:
+        print(f" LBMA index: {len(lbma_idx)} dates (spot sufficient)")
+
 # Sort dates for forward-fill
     all_dates_sorted = sorted(dates)
     last_dxy: float | None = None
@@ -574,9 +589,9 @@ def build_global_reference_daily() -> list[dict[str, Any]]:
             "vix": vix,
             "oil_wti_usd_barrel": oil,
             "sp500_index": sp500,
-            "silver_futures_close_usd_oz": None,  # series_id not detected in sample
-            "gold_futures_close_usd_oz": None,    # futures_basis file is empty
-            "usd_vnd_market_rate": None,          # no yfinance usd_vnd_market in sample data
+            "silver_futures_close_usd_oz": gm.get("SI=F"),
+            "gold_futures_close_usd_oz": gm.get("GC=F"),
+            "usd_vnd_market_rate": gm.get("USDVND=X"),
             "data_lineage": _lineage(
                 ["global_market_series", "fx_rates"],
                 f"outer_join_on_date|ffill_applied=yes",
