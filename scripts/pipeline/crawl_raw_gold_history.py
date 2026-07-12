@@ -39,7 +39,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Collect raw historical Vietnamese gold quotes (unfiltered) for a date range.")
     parser.add_argument("--from", dest="from_date", default="2010-01-01")
     parser.add_argument("--to", dest="to_date", default=None, help="YYYY-MM-DD. Default is today.")
-    parser.add_argument("--out-dir", default="data/lake/raw_gold_15y")
+    parser.add_argument("--out-dir", default="data/lake")
     parser.add_argument(
         "--sources",
         default="sjc_official,webgia_sjc_archive,giavang_sjc_archive,giavang_pnj_archive",

@@ -122,7 +122,6 @@ def collect_enhanced_fred(start: str, end: str) -> list[dict[str, Any]]:
         print(f" FRED {series_id}: {obs_count} observations")
     return rows
 
-
 # ---------------------------------------------------------------------------
 # yfinance Ticker-based collector
 # ---------------------------------------------------------------------------
@@ -165,18 +164,14 @@ def _collect_yfinance_ticker(
         )
     return rows
 
-
 def collect_gld_etf(start: str, end: str) -> list[dict[str, Any]]:
     return _collect_yfinance_ticker("GLD", "gld_spdr_gold_etf", start, end)
-
 
 def collect_gc_futures(start: str, end: str) -> list[dict[str, Any]]:
     return _collect_yfinance_ticker("GC=F", "gold_futures_front_continuous", start, end)
 
-
 def collect_gold_futures_basis(start: str, end: str) -> list[dict[str, Any]]:
     return collect_gc_futures(start, end)
-
 
 # ---------------------------------------------------------------------------
 # LBMA Gold Fix — intercept Next.js RSC payload via JS hook
@@ -242,66 +237,11 @@ def collect_lbma_gold_price() -> list[dict[str, Any]]:
                         };
                     """,
                 )
-                # Extract captured API data
-                captured = r.evaluate("() => ({ apiUrls: window._lbmaApiUrls, dataKeys: window._lbmaPriceData ? Object.keys(window._lbmaPriceData) : [] })")
-                if captured:
-                    print(f" LBMA captured API URLs: {captured.get('apiUrls', [])}")
-                    pd = r.evaluate("() => JSON.stringify(window._lbmaPriceData?.gold || window._lbmaPriceData?.prices || window._lbmaPriceData?.data || window._lbmaPriceData || null)")
-                    print(f" LBMA captured data preview: {str(pd)[:300]}")
-
                 text = r.markdown or ""
                 raw_hash = hashlib.sha256(text.encode()).hexdigest()
+
                 count = 0
-
-                # Strategy 1: Try extracting from evaluate result
-                price_data = r.evaluate("""
-                    () => {
-                        try {
-                            const d = window._lbmaPriceData;
-                            if (!d) return null;
-                            // Try common paths
-                            const arr = d.gold || d.prices || d.data || d.results || d.items;
-                            if (!arr || !arr.length) return null;
-                            return arr.map(x => JSON.stringify(x)).join('\\n');
-                        } catch(e) { return null; }
-                    }
-                """)
-                if price_data and isinstance(price_data, str) and len(price_data) > 5:
-                    print(f" LBMA: extracted {len(price_data)} chars of price data via JS")
-                    for line in price_data.split("\n"):
-                        m = re.search(
-                            r"(\d{1,2}[/-]\d{1,2}[/-]\d{4})[\s,|]+(\d{2,5}[.,]\d{2,4})",
-                            line
-                        )
-                        if m:
-                            date_str, val = m.group(1), m.group(2)
-                            for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%m/%d/%Y"):
-                                try:
-                                    d = datetime.strptime(date_str, fmt).date().isoformat()
-                                    break
-                                except ValueError:
-                                    continue
-                            else:
-                                continue
-                            try:
-                                v = float(val.replace(",", "."))
-                            except ValueError:
-                                continue
-                            rows.append(
-                                {
-                                    "date": d,
-                                    "series_id": "LBMA_GOLD_FIX",
-                                    "asset": "lbma_gold_fix_usd_oz",
-                                    "value": v,
-                                    "unit": "usd_per_oz",
-                                    "source": "lbma_crawl4ai",
-                                    "raw_hash": raw_hash,
-                                    "available_from": d,
-                                }
-                            )
-                            count += 1
-
-                # Strategy 2: Fallback — parse markdown text for price patterns
+                # Strategy 1: Fallback — parse markdown text for price patterns
                 if count == 0:
                     print(" LBMA: trying markdown text fallback...")
                     for line in text.split("\n"):
@@ -324,7 +264,7 @@ def collect_lbma_gold_price() -> list[dict[str, Any]]:
                             except ValueError:
                                 continue
                             # Sanity: price should be >$1000 for post-2000 gold
-                            if v < 500 or v > 10000:
+                            if v < 500 or v > 100000:
                                 continue
                             rows.append(
                                 {
@@ -352,7 +292,6 @@ def collect_lbma_gold_price() -> list[dict[str, Any]]:
             pool.submit(lambda: asyncio.run(_crawl())).result(timeout=120)
     return rows
 
-
 # ---------------------------------------------------------------------------
 # GLD shares outstanding
 # ---------------------------------------------------------------------------
@@ -367,8 +306,8 @@ def collect_gld_shares_outstanding() -> list[dict[str, Any]]:
             rows.append(
                 {
                     "date": today,
-                    "series_id": "GLD_SHARES_OUTSTANDING",
-                    "asset": "gld_etf_shares_outstanding",
+                    "series_id": "GLD_SHARES_OUTSTANDING_CURRENT",
+                    "asset": "gld_etf_shares_outstanding_current",
                     "value": float(so_val),
                     "unit": "shares",
                     "source": "yfinance_gld_info",
@@ -382,7 +321,6 @@ def collect_gld_shares_outstanding() -> list[dict[str, Any]]:
     except Exception as exc:
         print(f" GLD shares outstanding error: {type(exc).__name__}: {exc}")
     return rows
-
 
 def collect_gld_shares_historical(from_date: str, to_date: str) -> list[dict[str, Any]]:
     """Fetch GLD shares outstanding from SEC EDGAR XBRL."""
@@ -424,8 +362,8 @@ def collect_gld_shares_historical(from_date: str, to_date: str) -> list[dict[str
                         rows.append(
                             {
                                 "date": end_d,
-                                "series_id": "GLD_SHARES_OUTSTANDING",
-                                "asset": "gld_etf_shares_outstanding",
+                                "series_id": "GLD_SHARES_OUTSTANDING_HIST",
+                                "asset": "gld_etf_shares_outstanding_hist",
                                 "value": float(val),
                                 "unit": "shares",
                                 "source": "sec_edgar_xbrl",
@@ -442,12 +380,10 @@ def collect_gld_shares_historical(from_date: str, to_date: str) -> list[dict[str
         print(f" GLD shares (SEC): {type(exc).__name__}: {str(exc)[:80]}")
     return rows
 
-
 # ---------------------------------------------------------------------------
 # SBV deposit rates
 # ---------------------------------------------------------------------------
 _VN_DEPOSIT_CONTENT_STRUCTURE_ID = "137473"
-
 
 def collect_vietnam_deposit_rates() -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
@@ -538,25 +474,22 @@ def collect_vietnam_deposit_rates() -> list[dict[str, Any]]:
     print(f" SBV deposit rates: {len(unique)} unique, {non_null} with non-null value")
     return unique
 
-
 def _parse_sbv_rate_text(fields: dict[str, str]) -> float | None:
     """Extract rate from SBV content fields.
 
     Known field names: TyGiaSo (rate value), TyGiaChu (currency),
     ChuThich (description), SoVanBan (doc number).
     """
-    # Priority 1: Known direct rate field
+    # Priority 1: Known direct rate field (raw value; unit may not be pct)
     for key in ("TyGiaSo", "ty_gia_so", "TyGia", "ty_gia"):
         val = fields.get(key, "")
         if val:
             try:
-                v = float(str(val).replace(",", ".").replace("%", "").strip())
-                if 0 < v < 100:
-                    return v
+                return float(str(val).replace(",", ".").replace("%", "").strip())
             except (ValueError, TypeError):
                 pass
 
-    # Priority 2: Field name contains rate keywords
+    # Priority 2: Field name contains rate keywords (raw value)
     rate_kw = ["laisuat", "lai_suat", "rate", "ty_le", "tyle", "lai", "gui", "tien"]
     candidates: list[float] = []
     for name, value in fields.items():
@@ -564,9 +497,7 @@ def _parse_sbv_rate_text(fields: dict[str, str]) -> float | None:
             continue
         if any(kw in name.lower() for kw in rate_kw):
             try:
-                v = float(str(value).replace(",", ".").replace("%", "").strip())
-                if 0 < v < 100:
-                    candidates.append(v)
+                candidates.append(float(str(value).replace(",", ".").replace("%", "").strip()))
             except (ValueError, TypeError):
                 pass
     if candidates:
@@ -580,15 +511,11 @@ def _parse_sbv_rate_text(fields: dict[str, str]) -> float | None:
         m = re.search(r"(\d{1,2}[.,]\d{1,2})\s*%", text)
         if m:
             try:
-                v = float(m.group(1).replace(",", "."))
-                if 0 < v < 100:
-                    return v
+                return float(m.group(1).replace(",", "."))
             except ValueError:
                 pass
 
     return None
-
-
 # ---------------------------------------------------------------------------
 # VN macro extractor (inline)
 # ---------------------------------------------------------------------------
@@ -610,7 +537,6 @@ _HIGH_SIGNAL: dict[str, tuple[str, str, str]] = {
     "LP_PE_NUM": ("population_10k", "10k_persons", "A"),
 }
 _SERIES_LOOKUP: dict[str, tuple[str, str, str]] = dict(_HIGH_SIGNAL)
-
 
 def _extract_vn_macro_inline(
     input_csv: str, from_date: str, to_date: str
@@ -670,16 +596,14 @@ def _extract_vn_macro_inline(
     }
     return out, manifest
 
-
 def collect_vn_macro(from_date: str, to_date: str) -> list[dict[str, Any]]:
-    input_csv = "data/lake/market_data/v1/normalized/macro_series.csv"
+    input_csv = "data/lake/macro_series_wb_gso.csv"
     try:
         rows, _ = _extract_vn_macro_inline(input_csv, from_date, to_date)
         return rows
     except Exception as exc:
         print(f" VN macro extract: {type(exc).__name__}: {exc}")
         return []
-
 
 # ---------------------------------------------------------------------------
 # Wedding season
@@ -722,7 +646,6 @@ def collect_wedding_season(from_date: str, to_date: str) -> list[dict[str, Any]]
     print(f" Wedding season: {len(rows)} event rows")
     return rows
 
-
 # ---------------------------------------------------------------------------
 # News/sentiment via RSS (with crawl4ai fallback)
 # ---------------------------------------------------------------------------
@@ -755,7 +678,6 @@ _NEGATIVE_VI = {"giảm", "giảm giá", "bán ra", "lỗ", "suy thoái", "lo ng
 _POSITIVE_EN = {"rise", "surge", "gain", "rally", "bullish", "positive", "recovery", "strong"}
 _NEGATIVE_EN = {"fall", "plunge", "crash", "bearish", "negative", "recession", "fear", "crisis", "collapse"}
 
-
 def _fetch_rss(url: str, timeout: int = 20) -> str | None:
     try:
         req = _url_request.Request(
@@ -770,7 +692,6 @@ def _fetch_rss(url: str, timeout: int = 20) -> str | None:
     except Exception as exc:
         print(f" RSS fetch [{url[:60]}]: {type(exc).__name__}")
         return None
-
 
 def collect_news_rss(from_date: str, to_date: str, timeout: int = 20) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
@@ -881,7 +802,6 @@ def collect_news_rss(from_date: str, to_date: str, timeout: int = 20) -> list[di
     rows.sort(key=lambda x: (x["date"], x["source"]))
     return rows
 
-
 # ---------------------------------------------------------------------------
 # Policy events (manual curation)
 # ---------------------------------------------------------------------------
@@ -959,7 +879,6 @@ def collect_policy_events() -> list[dict[str, Any]]:
         },
     ]
 
-
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -971,17 +890,15 @@ class FeatureStatus:
     records: int
     warning: str = ""
 
-
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Collect enhanced external features v2.")
     p.add_argument("--from", dest="from_date", default="2010-01-01")
     p.add_argument("--to", dest="to_date", default=date.today().isoformat())
-    p.add_argument("--out-dir", default="data/lake/market_data/v2")
+    p.add_argument("--out-dir", default="data/lake")
     p.add_argument("--format", default="csv")
     p.add_argument("--timeout", type=int, default=30)
     p.add_argument("--retries", type=int, default=1)
     return p.parse_args()
-
 
 def main() -> int:
     args = parse_args()
@@ -1001,9 +918,7 @@ def main() -> int:
         "gld_shares": [],
         "vn_deposit_rates": [],
         "vn_macro": [],
-        "wedding_events": [],
-        "policy_events": [],
-        "news_events": [],
+                "news_events": [],
     }
     statuses: list[FeatureStatus] = []
 
@@ -1094,28 +1009,7 @@ def main() -> int:
     except Exception as exc:
         statuses.append(FeatureStatus("gso_macro_curated", "vn_macro", "error", 0, str(exc)))
         print(f"VN macro error: {exc}")
-
-    # 6. Wedding season
-    try:
-        ws_rows = collect_wedding_season(args.from_date, args.to_date)
-        datasets["wedding_events"].extend(ws_rows)
-        statuses.append(FeatureStatus("rule_based", "wedding_events", "ok", len(ws_rows)))
-        print(f"Wedding season: {len(ws_rows)} rows")
-    except Exception as exc:
-        statuses.append(FeatureStatus("rule_based", "wedding_events", "error", 0, str(exc)))
-        print(f"Wedding season error: {exc}")
-
-    # 7. Policy events
-    try:
-        pol_rows = collect_policy_events()
-        datasets["policy_events"].extend(pol_rows)
-        statuses.append(FeatureStatus("manual_curation", "policy_events", "ok", len(pol_rows)))
-        print(f"Policy events: {len(pol_rows)} rows")
-    except Exception as exc:
-        statuses.append(FeatureStatus("manual_curation", "policy_events", "error", 0, str(exc)))
-        print(f"Policy events error: {exc}")
-
-    # 8. News RSS
+    # 6. News RSS
     try:
         news_rows = collect_news_rss(args.from_date, args.to_date, args.timeout)
         datasets["news_events"].extend(news_rows)
@@ -1152,7 +1046,6 @@ def main() -> int:
     print(f"\nDone. Total records: {manifest['total_records']}")
     print(f"Output: {out_dir}")
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

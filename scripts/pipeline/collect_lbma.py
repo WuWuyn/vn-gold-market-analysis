@@ -8,7 +8,7 @@ No auth required. Returns AM + PM fix prices in USD/GBP/EUR.
 Limitation: only TODAY's data is available (not historical archive).
 This collector should be run daily to build a time series.
 
-Output: data/lake/market_data/v2/normalized/lbma_spot.csv
+Output: data/lake/normalized/lbma_gold_spot_am_pm.csv
 """
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ bootstrap()
 from gold_collectors.full_pipeline import DataLakeWriter  # noqa: E402
 
 LBMA_TODAY_URL = "https://prices.lbma.org.uk/json/today.json"
-OUT_DIR = Path("data/lake/market_data/v2")
+OUT_DIR = Path("data/lake")
 NORMALIZED = OUT_DIR / "normalized"
 NORMALIZED.mkdir(parents=True, exist_ok=True)
 
@@ -104,7 +104,7 @@ def parse_lbma_response(data: dict[str, Any]) -> list[dict[str, Any]]:
 
 def merge_with_existing(new_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Merge new rows with existing CSV, dedup on (date, series_id, fix_type)."""
-    csv_path = NORMALIZED / "lbma_spot.csv"
+    csv_path = NORMALIZED / "lbma_gold_spot_am_pm.csv"
     existing: list[dict[str, Any]] = []
     if csv_path.exists():
         with open(csv_path, encoding="utf-8") as f:
@@ -137,11 +137,11 @@ def write_csv(rows: list[dict[str, Any]]) -> None:
         "date", "series_id", "value", "unit", "source", "available_from",
         "fix_type", "gbp", "eur", "timestamp_raw",
     ]
-    with open(NORMALIZED / "lbma_spot.csv", "w", encoding="utf-8", newline="") as f:
+    with open(NORMALIZED / "lbma_gold_spot_am_pm.csv", "w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)
-    print(f"Wrote {len(rows):,} rows to {NORMALIZED / 'lbma_spot.csv'}")
+    print(f"Wrote {len(rows):,} rows to {NORMALIZED / 'lbma_gold_spot_am_pm.csv'}")
     # Also write manifest
     manifest = {
         "generated_at": date.today().isoformat(),

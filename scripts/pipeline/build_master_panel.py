@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Master Panel Builder for Vietnam Gold Market Analysis
 ======================================================
@@ -38,12 +38,12 @@ Null handling strategy (per table):
     - All rows are rule-generated — no imputation
     - Calendar rows (weekday, month) are timelessly active
 
-Output: data/lake/enriched/master/
-  data/lake/enriched/master/gold_domestic_daily_panel.csv
-  data/lake/enriched/master/global_reference_daily.csv
-  data/lake/enriched/master/vn_macro_asof_panel.csv
-  data/lake/enriched/master/event_regime_panel.csv
-  data/lake/enriched/master/manifests/*.json
+Output: data/lake/
+  data/lake/pipeline_output_domestic_daily.csv
+  data/lake/pipeline_output_global_reference.csv
+  data/lake/pipeline_output_vn_macro_asof.csv
+  data/lake/pipeline_output_event_regime.csv
+  data/lake/manifests/*.json
 """
 
 from __future__ import annotations
@@ -68,10 +68,11 @@ from gold_collectors.full_pipeline import DataLakeWriter  # noqa: E402
 ROOT = Path(__file__).resolve().parents[2]  # project root
 LAKE = ROOT / "data" / "lake"
 ENRICHED = LAKE / "enriched"
-RAW_GOLD = LAKE / "raw_gold_15y" / "normalized"
-AUDITED = LAKE / "domestic_target" / "normalized"
-EXT = LAKE / "market_data" / "v1" / "normalized"
-EXT_V2 = LAKE / "market_data" / "v2" / "normalized"
+GOLD_PRICES = LAKE  # kept for backward compat in comments
+RAW_GOLD = LAKE / "gold_raw_history_all_sources_2010_2026.csv"
+AUDITED = LAKE / "gold_quotes_sjc_historical.csv"
+
+EXT_V2 = LAKE
 OUT = ENRICHED / "master"
 
 CHI_PER_OZ = 31.1034768 / 1.205  # 1 troy oz in chi
@@ -116,7 +117,7 @@ GM_SERIES: dict[str, str] = {
     "CL=F": "oil_wti_usd_barrel",
 }
 
-FX_PAIRS = ("USD/VND", "USDVND")
+FX_PAIRS = ("USD/VND",)
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -241,8 +242,8 @@ def _ffill_available_from(rows: list[dict], group_keys: tuple[str, ...] = ("sour
 # ══════════════════════════════════════════════════════════════════════════
 
 def build_gold_domestic_daily_panel() -> list[dict[str, Any]]:
-    RAW = RAW_GOLD / "raw_gold_history.csv"
-    AUD = AUDITED / "domestic_gold_quotes.csv"
+    RAW = RAW_GOLD
+    AUD = AUDITED
     rows_raw = _load_csv(RAW)
     rows_aud = _load_csv(AUD)
 
@@ -431,8 +432,8 @@ def build_gold_domestic_daily_panel() -> list[dict[str, Any]]:
 #   data_lineage,
 #   build_timestamp
 # Inputs:
-#   external_features/normalized/global_market_series.csv
-#   external_features/normalized/fx_rates.csv
+#   external_features/global_market_series.csv
+#   external_features/fx_rates.csv
 #   external_features_v2/futures_basis.csv (empty, GC=F)
 #   external_features_v2/etf_proxy.csv (empty, GLD)
 #   external_features_v2/gld_shares/ (empty)
@@ -448,13 +449,13 @@ def build_gold_domestic_daily_panel() -> list[dict[str, Any]]:
 # ══════════════════════════════════════════════════════════════════════════
 
 def build_global_reference_daily() -> list[dict[str, Any]]:
-    GM = EXT / "global_market_series.csv"
-    FX = EXT / "fx_rates.csv"
+    GM = EXT_V2 / "global_market_series_yfinance_fred.csv"
+    FX = EXT_V2 / "fx_rates_vietcombank_sbv.csv"
     rows_gm = _load_csv(GM)
     rows_fx = _load_csv(FX)
-    rows_basis = _load_csv(EXT_V2 / "futures_basis.csv")
-    rows_etf   = _load_csv(EXT_V2 / "etf_proxy.csv")
-    rows_mcr_v2 = _load_csv(EXT_V2 / "macro_enhanced.csv")
+    rows_basis = _load_csv(EXT_V2 / "futures_basis_gc_f.csv")
+    rows_etf   = _load_csv(EXT_V2 / "etf_proxy_gld.csv")
+    rows_mcr_v2 = _load_csv(EXT_V2 / "macro_enhanced_fred_expanded.csv")
 
     print(f"  global_market_series: {len(rows_gm):,} | fx_rates: {len(rows_fx):,} | "
           f"futures_basis: {len(rows_basis)} | etf: {len(rows_etf)} | macro_v2: {len(rows_mcr_v2)}")
@@ -506,7 +507,7 @@ def build_global_reference_daily() -> list[dict[str, Any]]:
 
     #     # LBMA: load CSV if present, index by date (AM fix)
     lbma_idx: dict[str, float] = {}
-    lbma_csv_path = EXT_V2 / "lbma_spot.csv"
+    lbma_csv_path = EXT_V2 / "lbma_gold_spot_am_pm.csv"
     if lbma_csv_path.exists():
         for r in _load_csv(lbma_csv_path):
             d = _iso_date(r.get("date", ""))
@@ -518,7 +519,7 @@ def build_global_reference_daily() -> list[dict[str, Any]]:
         print(f" LBMA index: {len(lbma_idx)} dates loaded from CSV")
 
     if len(lbma_idx) < 20:
-        lbma_proxy_path = EXT_V2 / "lbma_proxy.csv"
+        lbma_proxy_path = LAKE / "lbma_gold_proxy_gc_f.csv"
         if lbma_proxy_path.exists() and lbma_proxy_path.stat().st_size > 100:
             for r in _load_csv(lbma_proxy_path):
                 d_p = _iso_date(r.get("date", ""))
@@ -570,6 +571,8 @@ def build_global_reference_daily() -> list[dict[str, Any]]:
             oil = last_oil
 
         usd_vnd_mid = fx_mid_idx.get(d)
+        # Fallback: yfinance USDVND=X daily close (~3912 rows)
+        usd_vnd_mid = usd_vnd_mid or gm.get("USDVND=X")
         if usd_vnd_mid is not None:
             last_usd_vnd = usd_vnd_mid
         else:
@@ -583,7 +586,7 @@ def build_global_reference_daily() -> list[dict[str, Any]]:
             "usd_vnd_bid": None,
             "usd_vnd_ask": None,
             "usd_vnd_mid": usd_vnd_mid,
-            "usd_vnd_availability": fx_avail_idx.get(d, "missing"),
+            "usd_vnd_availability": fx_avail_idx.get(d, "missing") if usd_vnd_mid else "missing",
             "treasury_10y_pct": t10y,
             "dxy_index": dxy,
             "vix": vix,
@@ -617,7 +620,7 @@ def build_global_reference_daily() -> list[dict[str, Any]]:
 #   data_lineage,
 #   build_timestamp
 # Inputs:
-#   external_features/normalized/macro_series.csv  (GSO + World Bank)
+#   external_features/macro_series.csv  (GSO + World Bank)
 #   external_features_v2/macro_enhanced.csv        (FRED v2)
 #   external_features_v2/vn_macro_forecasting.csv  (forecasting / VN-specific)
 # Join: (source, series_id, observation_date)
@@ -630,8 +633,8 @@ def build_global_reference_daily() -> list[dict[str, Any]]:
 # ══════════════════════════════════════════════════════════════════════════
 
 def build_vn_macro_asof_panel() -> list[dict[str, Any]]:
-    MCR  = EXT / "macro_series.csv"
-    MCR2 = EXT_V2 / "macro_enhanced.csv"
+    MCR = EXT_V2 / "macro_series_wb_gso.csv"
+    MCR2 = EXT_V2 / "macro_enhanced_fred_expanded.csv"
     VNFC = EXT_V2 / "vn_macro_forecasting.csv"
 
     rows_v1 = _load_csv(MCR)
@@ -734,7 +737,7 @@ def build_vn_macro_asof_panel() -> list[dict[str, Any]]:
 #   data_lineage,
 #   build_timestamp
 # Inputs:
-#   enriched/normalized/gold_event_panel.csv
+#   enriched/gold_event_panel.csv
 # Join: event_date + event_type (unique key)
 # Null handling:
 #   - effective_to null → is_active = True (open-ended)
@@ -746,7 +749,7 @@ CAL_EVENT_TYPES = {"calendar_weekday", "calendar_month"}
 
 
 def build_event_regime_panel() -> list[dict[str, Any]]:
-    EPATH = ENRICHED / "normalized" / "gold_event_panel.csv"
+    EPATH = LAKE / "gold_event_panel.csv"
     rows = _load_csv(EPATH)
     print(f"  gold_event_panel: {len(rows):,} rows")
 
@@ -804,34 +807,6 @@ def build_event_regime_panel() -> list[dict[str, Any]]:
     for r in rows:
         _add(r)
 
-    if not have_rows:
-        # Regenerate calendar features (avoid 6500 row explosion — generate only 2yr window)
-        for yr in range(2024, 2027):
-            for mo in range(1, 13):
-                for dy in range(1, 32):
-                    try:
-                        dt = date(yr, mo, dy)
-                    except ValueError:
-                        continue
-                    _add({
-                        "event_date": dt.isoformat(),
-                        "event_type": "calendar_weekday",
-                        "scope": "domestic_vietnam",
-                        "severity": "low",
-                        "expected_channel": "volume_pattern",
-                        "note": f"weekday_{dt.strftime('%A')}",
-                        "source": "rule_generated",
-                    })
-                    _add({
-                        "event_date": dt.isoformat(),
-                        "event_type": "calendar_month",
-                        "scope": "domestic_vietnam",
-                        "severity": "low",
-                        "expected_channel": "seasonal_pattern",
-                        "note": f"month_{mo}",
-                        "source": "rule_generated",
-                    })
-
     return out
 
 
@@ -862,6 +837,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    sys.stdout.reconfigure(encoding="utf-8")
     args = parse_args()
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -872,7 +848,7 @@ def main() -> int:
 
     counts: dict[str, int] = {}
     for name in targets:
-        print(f"\n── {name} ──")
+        print(f"\n== {name} ==")
         rows = TABLE_BUILDERS[name]()
         counts[name] = len(rows)
         if not rows:

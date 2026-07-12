@@ -8,7 +8,7 @@ Materializes:
 - spread_pct: (sell - buy) / sell
 - consensus_mid: (buy + sell) / 2
 
-Outputs to data/lake/gold_prices/
+Outputs to data/lake/
 """
 from __future__ import annotations
 
@@ -49,9 +49,9 @@ LUONG_PER_OZ = CHI_PER_OZ / 37.5 # gold standard conversion in Vietnam
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Build premium decomposition table.")
-    parser.add_argument("--audited-dir", default="data/lake/domestic_target")
-    parser.add_argument("--external-dir", default="data/lake/market_data/v1")
-    parser.add_argument("--out-dir", default="data/lake/gold_prices")
+    parser.add_argument("--audited-dir", default="data/lake")
+    parser.add_argument("--external-dir", default="data/lake")
+    parser.add_argument("--out-dir", default="data/lake")
     parser.add_argument("--registry", default="configs/source_registry_audited.yaml")
     return parser.parse_args()
 

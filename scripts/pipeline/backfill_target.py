@@ -29,7 +29,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--from", dest="from_date", default="2011-07-06")
     parser.add_argument("--to", dest="to_date", default="2026-07-06")
     parser.add_argument("--registry", default="configs/source_registry_audited.yaml")
-    parser.add_argument("--out-dir", default="data/lake/domestic_target")
+    parser.add_argument("--out-dir", default="data/lake")
     parser.add_argument("--cache-dir", default=None)
     parser.add_argument("--format", default="parquet,csv")
     parser.add_argument("--timeout", type=int, default=12)
@@ -93,7 +93,7 @@ def main() -> int:
         "historical_valid_sources": sorted(allowed_sources),
         "accepted_records": len(rows),
         "leakage_or_empty_flags": len(leakage_rows),
-        "target_csv": str(out_dir / "normalized" / "domestic_gold_quotes.csv"),
+        "target_csv": str(out_dir / "normalized" / "gold_quotes_sjc_historical.csv"),
     }
     (out_dir / "reports" / "backfill_summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(summary, ensure_ascii=False, indent=2))

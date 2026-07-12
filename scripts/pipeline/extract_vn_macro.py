@@ -11,7 +11,7 @@ only the most predictive indicators:
   - Imports CIF (monthly — proxy for gold demand via customs)
   - VN stock index end-of-period (monthly — sentiment proxy)
 
-Output: data/lake/gold_prices/normalized/vn_macro_forecasting.csv
+Output: data/lake/normalized/vn_macro_forecasting.csv
 
 All rows use `available_from` = observation date.
 CRITICAL: join by `available_from` (NOT `observation_date`) to prevent
@@ -75,9 +75,9 @@ class MacroExtractStatus:
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Extract high-signal VN macro indicators.")
-    p.add_argument("--input", default="data/lake/market_data/v1/normalized/macro_series.csv",
+    p.add_argument("--input", default="macro_series_wb_gso.csv",
                     help="Full macro_series.csv from v1 collector")
-    p.add_argument("--out-dir", default="data/lake/gold_prices")
+    p.add_argument("--out-dir", default="data/lake")
     p.add_argument("--from", dest="from_date", default="2010-01-01")
     p.add_argument("--to", dest="to_date", default=date.today().isoformat())
     return p.parse_args()

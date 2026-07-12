@@ -30,14 +30,24 @@ Thumbs.db
 *.sqlite
 *.db
 
-# Data lake — write-only artifacts, do not track
+# Recovery / backup — local archival, never commit
+.recovery/
+
+# Data lake — runtime artifacts not tracked by default
+# Raw crawl IS tracked (commit separately)
 data/lake/**/manifests/
 data/lake/**/reports/
 data/lake/**/checkpoints/
-data/lake/**/raw/
 
 # Keep small committed examples/documentation under data if needed.
 !data/
 !data/README.md
 !data/samples/
 !data/samples/**
+
+# Agent/intermediate artifacts — never commit
+.cache/
+tools/
+data/temp/
+data/experiments/
+Usersadmin.claudeprojectsC--Users-admin-Documents-Lab-Workplace-vn-gold-market-analysis*

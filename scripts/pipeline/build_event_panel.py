@@ -10,7 +10,7 @@ Creates a structured event table for Vietnamese gold market regimes:
 - Geopolitical / global crisis events affecting Vietnam gold
 
 These are rule-generated from known calendars + historical research.
-Outputs to data/lake/gold_prices/
+Outputs to data/lake/
 """
 from __future__ import annotations
 
@@ -72,7 +72,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Build Vietnam gold event panel.")
     parser.add_argument("--from", dest="from_date", default="2010-01-01")
     parser.add_argument("--to", dest="to_date", default="2027-12-31")
-    parser.add_argument("--out-dir", default="data/lake/gold_prices")
+    parser.add_argument("--out-dir", default="data/lake")
     return parser.parse_args()
 
 

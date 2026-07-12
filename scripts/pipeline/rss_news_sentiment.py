@@ -127,7 +127,7 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Collect Vietnam gold news/sentiment from RSS feeds.")
     p.add_argument("--from", dest="from_date", default="2010-01-01")
     p.add_argument("--to", dest="to_date", default=date.today().isoformat())
-    p.add_argument("--out-dir", default="data/lake/gold_prices")
+    p.add_argument("--out-dir", default="data/lake")
     p.add_argument("--timeout", type=int, default=20)
     return p.parse_args()
 

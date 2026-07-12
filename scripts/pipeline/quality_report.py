@@ -30,7 +30,7 @@ def _progress(items, description: str, enabled: bool):
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate quality reports for audited gold data collection.")
-    parser.add_argument("--data-lake", default="data/lake/domestic_target")
+    parser.add_argument("--data-lake", default="data/lake")
     parser.add_argument("--registry", default="configs/source_registry_audited.yaml")
     parser.add_argument("--from", dest="from_date", default="2011-07-06")
     parser.add_argument("--to", dest="to_date", default="2026-07-06")
@@ -52,7 +52,7 @@ def main() -> int:
     data_lake = Path(args.data_lake)
     report_dir = data_lake / "reports"
     report_dir.mkdir(parents=True, exist_ok=True)
-    rows = read_csv(data_lake / "normalized" / "domestic_gold_quotes.csv")
+    rows = read_csv(data_lake / "normalized" / "gold_quotes_sjc_historical.csv")
     registry = read_registry(args.registry)
 
     write_source_reliability(report_dir / "source_reliability.csv", registry)

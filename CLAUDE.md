@@ -75,25 +75,41 @@ python scripts/pipeline/build_premium_decomposition.py --audited-dir data/lake/d
 python scripts/pipeline/build_event_panel.py --from 2010-01-01 --to 2027-12-31 --out-dir data/lake/gold_prices
 ```
 
-## Current inventory (verified 2026-07-09)
+## Current inventory (verified 2026-07-11)
 
 ### Gold domestic
-- `raw_gold_15y/`: 2010-01-01 → 2026-07-07, sources: sjc_official, pnj, giavang_sjc, webgia_sjc. PNJ alone = 94k rows. Resume-complete.
-- `audited/normalized/domestic_gold_quotes.csv`: 28k rows, 1 source (sjc_official_history).
+- `raw_gold_15y/`: 2010-01-01 → 2026-07-07, sources: sjc_official, pnj, giavang_sjc, webgia_sjc. 96,326 rows total (giavang_pnj_archive: 61,778, webgia_sjc_archive: 24,994, giavang_sjc_archive: 9,492). Resume-complete.
+- `domestic_target/normalized/domestic_gold_quotes.csv`: 61,665 rows, 1 source (sjc_official_history). Only historical-valid source (requested_date == business_date, both prices valid).
 
-### External features
+### External features (v1)
 - `fx_rates`: 3,961 rows (Vietcombank + SBV central)
 - `global_market_series`: 41,584 rows (yfinance + FRED)
 - `macro_series`: 31,104 rows (World Bank annual + GSO)
 - `vn_market_series`: 3,917 rows (vnstock VNINDEX)
 
-### Gap vs deep-research-report
-- LBMA AM/PM benchmark: not yet crawled (use GC=F proxy for now)
-- FRED expanded: not yet added (DFII10, T10YIE, STLFSI, NFCI, etc.)
-- Gold futures basis: partial (GC=F only, no term structure)
-- VN deposit rates: not yet materialized as time series
-- Event panel: not yet built
-- Premium decomposition: not yet materialized
+### External features (v2)
+- `macro_enhanced`: 38,882 rows (FRED expanded: DFF, DGS10, DGS2, T10Y2Y, DXY, VIX, etc.)
+- `futures_basis`: GC=F daily from yfinance
+- `etf_proxy`: GLD daily from yfinance
+- `vn_news_backfill`: blocked by anti-bot (crawl4ai failed on all VN news sites)
+- `news_sentiment`: 3,138 rule-based signals (replaced 168-row RSS feed — rule-based uses VIX + gold momentum + USD/VND + event anchor)
+- `lbma_proxy`: 4,153 rows (GC=F daily close as LBMA AM proxy; World Bank monthly gold failed with 502)
+- `sbv_deposit_rates`: 43 rows (policy announcements, not time series — SBV API returns event data)
+- `vn_deposit_rates`: 0 non-null values (SBV TyGiaSo values 20,000+ range, parser expects 0-100%)
+
+### Master panel (all 4 tables verified 2026-07-11)
+- `gold_domestic_daily_panel`: domestic target integrated
+- `global_reference_daily`: v1 + v2 integrated (futures_basis, etf_proxy, macro_enhanced, lbma_proxy)
+- `vn_macro_asof_panel`: 36K rows (World Bank + GSO, joined by available_from)
+- `event_regime_panel`: 1,850 events, 13 event types (Tết, Thần Tài, wedding, policy, crisis, etc.)
+- `gold_daily_enriched`: 4,991 dates, 4,030 with premium (81% coverage)
+
+### Priority action items (remaining gaps)
+1. Expand event panel beyond 1,850 toward 3,000 target
+2. VN deposit rates: SBV API returns policy announcements, not time series — need alternative source
+3. New domestic current sources (DOJI, Phu Quy, VietABank, BTMC, GoldVN) for live cross-validation
+4. Gold futures term structure (currently GC=F only)
+5. True GPR daily index (currently VIX-only proxy)
 
 ## Deep research report
 

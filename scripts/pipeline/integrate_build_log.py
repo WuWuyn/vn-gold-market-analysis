@@ -40,7 +40,7 @@ normalises casing and uses the platform separator.)
 Examples
 ~~~~~~~~
     ``.github/build-logs|CSR``        → ``<root>/.github/build-logs``
-    ``data/lake/_CSR_domestic_target``         → ``<root>/data/lake/domestic_target``
+    ``data/lake/_CSR_domestic_target``         → ``<root>/data/lake``
     ``scripts/pipeline/Other_SUFFIX`` → ``<root>/scripts/pipeline``
     ``abs|CSR``                        → absolute pass-through
 
@@ -349,7 +349,7 @@ def resolve_source_path(key: str) -> str:
     Examples
     --------
     ``.github/build-logs|CSR``        → ``<root>/.github/build-logs``
-    ``data/lake/_CSR_domestic_target``         → ``<root>/data/lake/domestic_target``
+    ``data/lake/_CSR_domestic_target``         → ``<root>/data/lake``
     ``scripts/pipeline/Other_SUFFIX`` → ``<root>/scripts/pipeline``
     ``abs|CSR``                        → ``abs`` (absolute pass-through)
     """
