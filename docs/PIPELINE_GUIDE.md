@@ -184,10 +184,10 @@ python scripts/pipeline/build_premium_decomposition.py --audited-dir data/lake/d
 
 **Đã làm gì:**
 - Tính 3 biến then chốt:
-  - `global_gold_vnd_per_luong` = LBMA USD/oz × USD/VND ÷ (31.103g/oz ÷ 1.205g/chi ÷ 37.5chi/luong)
+  - `global_gold_vnd_per_luong` = LBMA USD/oz × USD/VND × 37.5g/luong ÷ 31.1034768g/oz
   - `domestic_premium` = SJC sell_price − global_gold_vnd_per_luong
   - `spread_pct` = (sell − buy) / sell × 100
-- Formula chuyển đổi: 1 troy oz = 31.1035g; 1 chi = 1.205g; 1 luong = 37.5 chi → 1 oz ≈ 0.6886 luong
+- Formula chuyển đổi: 1 troy oz = 31.1034768g; 1 lượng = 37.5g → 1 lượng ≈ 1.20565 troy oz
 
 **Output:**
 - `data/lake/gold_prices/normalized/gold_daily_enriched.csv` (4,991 dates, 4,030 có premium = 81% coverage)

@@ -74,10 +74,10 @@ AUDITED = LAKE / "gold_quotes_sjc_historical.csv"
 EXT_V2 = LAKE
 OUT = LAKE  # flat output
 
-CHI_PER_OZ = 31.1034768 / 1.205  # 1 troy oz in chi
-LUONG_PER_OZ = CHI_PER_OZ / 37.5  # ~0.6886 troy oz per luong
-
-LBMA_USD_PER_LUONG = 1.0 / LUONG_PER_OZ  # USD/oz -> VND/luong equivalent should use USD/oz * rate/VND/luong
+TROY_OZ_GRAMS = 31.1034768
+GRAMS_PER_LUONG = 37.5
+OZ_PER_LUONG = GRAMS_PER_LUONG / TROY_OZ_GRAMS
+LBMA_USD_PER_LUONG = OZ_PER_LUONG
 
 SOURCE_QUALITY: dict[str, float] = {
     "sjc_official_history": 0.95,

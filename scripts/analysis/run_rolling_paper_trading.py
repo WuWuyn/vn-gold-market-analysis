@@ -14,7 +14,7 @@ import argparse
 import csv
 import json
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -37,7 +37,7 @@ def load_forecasts(path: Path, after: str) -> pd.DataFrame:
     df = pd.read_csv(path)
     required = {
         "snapshot_date",
-        "horizon_days",
+        "horizon_months",
         "predicted_net_return",
         "q10_predicted_net_return",
         "prob_return_positive",
@@ -97,20 +97,20 @@ def price_on_or_before(prices: pd.DataFrame, target_date: pd.Timestamp) -> pd.Se
     return sub.iloc[-1]
 
 
-def make_trade_id(signal_date: pd.Timestamp, horizon: int, model_version: str) -> str:
+def make_trade_id(signal_date: pd.Timestamp, horizon_months: int, model_version: str) -> str:
     compact = signal_date.strftime("%Y%m%d")
-    return f"vn_gold_{compact}_{horizon}d_{model_version}"
+    return f"vn_gold_{compact}_{horizon_months}m_{model_version}"
 
 
 def build_ledger(forecasts: pd.DataFrame, prices: pd.DataFrame, model_version: str) -> pd.DataFrame:
     rows: list[dict[str, Any]] = []
-    for _, forecast in forecasts.sort_values(["snapshot_date", "horizon_days"]).iterrows():
+    for _, forecast in forecasts.sort_values(["snapshot_date", "horizon_months"]).iterrows():
         signal_date = forecast["snapshot_date"]
-        horizon = int(forecast["horizon_days"])
+        horizon_months = int(forecast["horizon_months"])
         entry_row = price_on_or_before(prices, signal_date)
         buy_signal = bool(forecast.get("buy_signal"))
         decision = "buy" if buy_signal else "no_buy"
-        exit_target = signal_date + timedelta(days=horizon)
+        exit_target = signal_date + pd.DateOffset(months=horizon_months)
         exit_row = price_on_or_after(prices, exit_target)
 
         entry_sell = float(entry_row["sell"]) if entry_row is not None else None
@@ -133,11 +133,11 @@ def build_ledger(forecasts: pd.DataFrame, prices: pd.DataFrame, model_version: s
 
         rows.append(
             {
-                "trade_id": make_trade_id(signal_date, horizon, model_version),
+                "trade_id": make_trade_id(signal_date, horizon_months, model_version),
                 "model_version": model_version,
                 "feature_date": signal_date.date().isoformat(),
                 "signal_date": signal_date.date().isoformat(),
-                "horizon_days": horizon,
+                "horizon_months": horizon_months,
                 "target_exit_date": exit_target.date().isoformat(),
                 "entry_date": entry_date,
                 "entry_sell_price": entry_sell,
@@ -163,12 +163,17 @@ def merge_existing(new_ledger: pd.DataFrame, out_path: Path) -> pd.DataFrame:
     if not out_path.exists() or out_path.stat().st_size == 0:
         return new_ledger
     existing = pd.read_csv(out_path)
+    if "horizon_months" not in existing.columns:
+        existing = existing.iloc[0:0].copy()
+    else:
+        existing = existing[existing["horizon_months"].notna()].copy()
     combined = pd.concat([existing, new_ledger], ignore_index=True)
     combined = (
-        combined.sort_values(["signal_date", "horizon_days", "generated_at"])
+        combined.sort_values(["signal_date", "horizon_months", "generated_at"])
                 .drop_duplicates(subset=["trade_id"], keep="last")
                 .reset_index(drop=True)
     )
+    combined = combined.drop(columns=["horizon_days"], errors="ignore")
     return combined
 
 
@@ -187,12 +192,12 @@ def summarize(ledger: pd.DataFrame) -> dict[str, Any]:
         "by_horizon": [],
         "blockers": [],
     }
-    for horizon in sorted(ledger["horizon_days"].dropna().unique()) if not ledger.empty else []:
-        sub = ledger[ledger["horizon_days"].eq(horizon)]
+    for horizon in sorted(ledger["horizon_months"].dropna().unique()) if not ledger.empty else []:
+        sub = ledger[ledger["horizon_months"].eq(horizon)]
         sub_closed = sub[sub["exit_status"].eq("closed")]
         summary["by_horizon"].append(
             {
-                "horizon_days": int(horizon),
+                "horizon_months": int(horizon),
                 "rows": int(len(sub)),
                 "buy_rows": int(sub["decision"].eq("buy").sum()),
                 "open_rows": int(sub["exit_status"].eq("open").sum()),

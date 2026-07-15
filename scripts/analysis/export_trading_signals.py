@@ -7,7 +7,7 @@ one-row-per-date export suitable for paper-trading simulation.
 
 Outputs:
     data/lake/modeling/trading_signals.csv          — daily master signal table
-    data/lake/modeling/trading_signals_105d.csv     — 105d-only signal table
+    data/lake/modeling/trading_signals_5m.csv       — 5-month-only signal table
     data/lake/modeling/trading_signals_summary.json — phase-level aggregates
 
 Signal rule (configurable):
@@ -40,7 +40,7 @@ except ImportError:
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SIGNALS = ROOT / "data" / "lake" / "modeling" / "decision_signals.csv"
 DEFAULT_OUT = ROOT / "data" / "lake" / "modeling"
-DEFAULT_HORIZON = 105
+DEFAULT_HORIZON = 5
 DEFAULT_PROB = 0.50
 DEFAULT_Q10FLOOR = -0.10
 
@@ -48,7 +48,7 @@ DEFAULT_Q10FLOOR = -0.10
 def _load_signals(path: Path) -> pd.DataFrame:
     df = pd.read_csv(path)
     required = {
-        "date", "horizon_days", "phase", "fold", "model", "prediction_type",
+        "date", "horizon_months", "phase", "fold", "model", "prediction_type",
         "actual_net_return", "predicted_net_return",
         "prob_return_positive", "q10_predicted_net_return",
         "selected_model", "prob_threshold", "q10_floor",
@@ -73,10 +73,10 @@ def _filter_threshold(
         & df["q10_floor"].astype(float).eq(q10_floor)
     )
     if horizon is not None:
-        mask &= df["horizon_days"].astype(int).eq(horizon)
+        mask &= df["horizon_months"].astype(int).eq(horizon)
     out = df[mask].copy()
     if out.empty:
-        phase_subsets = df.groupby("phase")["horizon_days"].unique().to_dict()
+        phase_subsets = df.groupby("phase")["horizon_months"].unique().to_dict()
         sys.exit(
             f"No rows match prob>={prob}, q10>={q10_floor}, horizon={horizon}. "
             f"Available horizons: {phase_subsets}. Check config or use --horizon-only."
@@ -97,8 +97,8 @@ def _collapse_days(df: pd.DataFrame) -> pd.DataFrame:
     # Keep one representative row per (date, horizon, fold) and drop model-level
     # duplicates within that pod.
     rep = (
-        df.sort_values(["date", "horizon_days", "fold", "model"])
-          .drop_duplicates(subset=["date", "horizon_days", "fold"], keep="first")
+        df.sort_values(["date", "horizon_months", "fold", "model"])
+          .drop_duplicates(subset=["date", "horizon_months", "fold"], keep="first")
           .copy()
     )
 
@@ -108,7 +108,7 @@ def _collapse_days(df: pd.DataFrame) -> pd.DataFrame:
         "q10_predicted_net_return": "q10_floor_return",
     })
 
-    group_keys = ["date", "horizon_days"]
+    group_keys = ["date", "horizon_months"]
     any_signal = df.groupby(group_keys)["buy_signal"].max().rename("buy_signal_any")
     sig_counts = df.groupby(group_keys)["buy_signal"].sum().rename("signal_count_per_fold")
     fold_counts = df.groupby(group_keys)["fold"].nunique().rename("fold_count")
@@ -119,7 +119,7 @@ def _collapse_days(df: pd.DataFrame) -> pd.DataFrame:
     merged = rep.merge(aux, on=group_keys, how="left")
 
     out_cols = [
-        "date", "phase", "horizon_days", "fold", "selected_model",
+        "date", "phase", "horizon_months", "fold", "selected_model",
         "ensemble_return_forecast", "prob_positive", "q10_floor_return",
         "buy_signal", "buy_signal_any",
         "signal_count_per_fold", "fold_count", "avg_actual_return",
@@ -135,8 +135,8 @@ def _collapse_days(df: pd.DataFrame) -> pd.DataFrame:
 def _phase_summary_flat(df: pd.DataFrame) -> pd.DataFrame:
     rows = []
     for phase in ["validation", "test"]:
-        for horizon in sorted(df["horizon_days"].unique()):
-            sub = df[(df["phase"] == phase) & (df["horizon_days"] == horizon)].copy()
+        for horizon in sorted(df["horizon_months"].unique()):
+            sub = df[(df["phase"] == phase) & (df["horizon_months"] == horizon)].copy()
             if sub.empty:
                 continue
             unique_dates = sub.groupby("date")["buy_signal"].max()
@@ -147,7 +147,7 @@ def _phase_summary_flat(df: pd.DataFrame) -> pd.DataFrame:
             day_ret = sub.loc[sub["buy_signal"], "actual_net_return"].mean() if signal_rows else 0.0
             rows.append({
                 "phase": phase,
-                "horizon_d": int(horizon),
+                "horizon_months": int(horizon),
                 "total_days": total_days,
                 "signal_days": signal_days,
                 "signal_rate_%": round(100.0 * signal_days / max(total_days, 1), 2),
@@ -207,7 +207,7 @@ def main() -> None:
         "--horizon",
         type=int,
         default=None,
-        help=f"Preferred signal horizon (default: all; use 105 for single horizon)",
+        help=f"Preferred signal horizon in months (default: all; use 5 for single horizon)",
     )
     parser.add_argument("--quiet", action="store_true", help="Skip rich console output")
     args = parser.parse_args()
@@ -217,7 +217,7 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     df = _load_signals(signals_path)
-    avail_horizons = sorted(df["horizon_days"].unique())
+    avail_horizons = sorted(df["horizon_months"].unique())
     if not args.quiet:
         print(f"Loaded {len(df):,} rows from {signals_path}")
         print(f"  Horizons available: {avail_horizons}")
@@ -227,7 +227,7 @@ def main() -> None:
     # Filter rows matching the configured threshold
     filtered = _filter_threshold(df, prob=args.prob, q10_floor=args.q10_floor, horizon=args.horizon)
 
-    horizons_in_filtered = sorted(filtered["horizon_days"].unique())
+    horizons_in_filtered = sorted(filtered["horizon_months"].unique())
     if not args.quiet:
         print(f"  Filtered to {len(filtered):,} rows, horizons {horizons_in_filtered}")
 
@@ -242,13 +242,13 @@ def main() -> None:
 
     # ─── Write per-horizon outputs ─────────────────────────────────────────────
     horizon_files: dict[int, Path] = {}
-    for h in sorted(collapsed["horizon_days"].unique()):
-        hdf = collapsed[collapsed["horizon_days"] == h].copy()
-        fp = out_dir / f"trading_signals_{int(h)}d.csv"
+    for h in sorted(collapsed["horizon_months"].unique()):
+        hdf = collapsed[collapsed["horizon_months"] == h].copy()
+        fp = out_dir / f"trading_signals_{int(h)}m.csv"
         hdf.to_csv(fp, index=False)
         horizon_files[int(h)] = fp
         if not args.quiet:
-            print(f"[✓] Wrote {int(h)}d  → {fp}  ({len(hdf):,} rows)")
+            print(f"[✓] Wrote {int(h)}m  → {fp}  ({len(hdf):,} rows)")
 
     # ─── Phase summary ─────────────────────────────────────────────────────────
     summary_df = _phase_summary_flat(collapsed)
@@ -292,7 +292,7 @@ def main() -> None:
         test_df = summary_df[summary_df["phase"] == "test"]
         if not test_df.empty:
             best = test_df.loc[test_df["avg_strategy_ret_%"].idxmax()]
-            print(f"Best test horizon: {int(best['horizon_d'])}d "
+            print(f"Best test horizon: {int(best['horizon_months'])}m "
                   f"(signal_rate={best['signal_rate_%']}%, "
                   f"avg_return={best['avg_strategy_ret_%']}%)")
 

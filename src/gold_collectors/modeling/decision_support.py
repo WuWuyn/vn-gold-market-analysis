@@ -15,9 +15,20 @@ ROOT = Path(__file__).resolve().parents[3]
 LAKE = ROOT / "data" / "lake"
 REPORTS = ROOT / "docs" / "reports"
 
-HORIZONS = (21, 63, 105)
+HORIZONS = (1, 3, 5)
 LAGS = (1, 5, 10, 21, 63, 105)
-LUONG_PER_OZ = (31.1034768 / 1.205) / 37.5
+TROY_OZ_GRAMS = 31.1034768
+GRAMS_PER_LUONG = 37.5
+OZ_PER_LUONG = GRAMS_PER_LUONG / TROY_OZ_GRAMS
+LUONG_PER_OZ = TROY_OZ_GRAMS / GRAMS_PER_LUONG
+
+
+def horizon_label(horizon_months: int) -> str:
+    return f"{horizon_months}m"
+
+
+def _target_col(horizon_months: int) -> str:
+    return f"net_return_{horizon_months}m"
 
 
 @dataclass(frozen=True)
@@ -198,7 +209,7 @@ def _merge_deposit_asof(frame: pd.DataFrame, config: ModelingConfig) -> pd.DataF
     if rates.empty:
         return frame
 
-    horizon_to_tenor = {21: 1, 63: 3, 105: 5}
+    horizon_to_tenor = {1: 1, 3: 3, 5: 5}
     out = frame.sort_values("date").copy()
     for horizon, tenor in horizon_to_tenor.items():
         sub = (
@@ -216,10 +227,10 @@ def _merge_deposit_asof(frame: pd.DataFrame, config: ModelingConfig) -> pd.DataF
             right_on="available_from",
             direction="backward",
         )
-        rate_col = f"deposit_rate_{horizon}d_annual_pct"
-        ret_col = f"deposit_return_{horizon}d"
+        rate_col = f"deposit_rate_{horizon}m_annual_pct"
+        ret_col = f"deposit_return_{horizon}m"
         out[rate_col] = merged["rate_pct_annual"].to_numpy()
-        out[ret_col] = (out[rate_col] / 100.0) * (horizon / 365.0)
+        out[ret_col] = (out[rate_col] / 100.0) * (horizon / 12.0)
     return out
 
 
@@ -373,17 +384,54 @@ def _maybe_merge_news(frame: pd.DataFrame, config: ModelingConfig, diagnostics: 
 
 
 def _add_targets(frame: pd.DataFrame, horizons: tuple[int, ...]) -> pd.DataFrame:
-    frame = frame.sort_values("date").copy()
+    frame = frame.sort_values("date").reset_index(drop=True).copy()
+    dates = pd.to_datetime(frame["date"], errors="coerce").reset_index(drop=True)
+    buy = pd.to_numeric(frame["buy_price"], errors="coerce").reset_index(drop=True)
+    sell = pd.to_numeric(frame["sell_price"], errors="coerce").reset_index(drop=True)
+
     for horizon in horizons:
-        future_buy = frame["buy_price"].shift(-horizon)
-        future_sell = frame["sell_price"].shift(-horizon)
-        future_min_buy = frame["buy_price"].shift(-1).iloc[::-1].rolling(horizon, min_periods=horizon).min().iloc[::-1]
-        frame[f"future_buy_{horizon}d"] = future_buy
-        frame[f"net_return_{horizon}d"] = future_buy / frame["sell_price"] - 1
-        frame[f"gross_sell_return_{horizon}d"] = future_sell / frame["sell_price"] - 1
-        frame[f"future_drawdown_{horizon}d"] = future_min_buy / frame["sell_price"] - 1
-        frame[f"positive_return_{horizon}d"] = (frame[f"net_return_{horizon}d"] > 0).astype(float)
-        frame.loc[frame[f"net_return_{horizon}d"].isna(), f"positive_return_{horizon}d"] = np.nan
+        target_dates = dates + pd.DateOffset(months=int(horizon))
+        exit_dates: list[pd.Timestamp | pd.NaT] = []
+        future_buy_values: list[float] = []
+        future_sell_values: list[float] = []
+        future_min_buy_values: list[float] = []
+        holding_days: list[float] = []
+
+        for idx, target_date in enumerate(target_dates):
+            if pd.isna(target_date):
+                exit_dates.append(pd.NaT)
+                future_buy_values.append(np.nan)
+                future_sell_values.append(np.nan)
+                future_min_buy_values.append(np.nan)
+                holding_days.append(np.nan)
+                continue
+
+            exit_pos = int(dates.searchsorted(target_date, side="left"))
+            if exit_pos >= len(frame):
+                exit_dates.append(pd.NaT)
+                future_buy_values.append(np.nan)
+                future_sell_values.append(np.nan)
+                future_min_buy_values.append(np.nan)
+                holding_days.append(np.nan)
+                continue
+
+            exit_dates.append(dates.iloc[exit_pos])
+            future_buy_values.append(float(buy.iloc[exit_pos]))
+            future_sell_values.append(float(sell.iloc[exit_pos]))
+            window = buy.iloc[idx + 1 : exit_pos + 1]
+            future_min_buy_values.append(float(window.min()) if not window.empty else np.nan)
+            holding_days.append(float((dates.iloc[exit_pos] - dates.iloc[idx]).days))
+
+        frame[f"target_date_{horizon}m"] = target_dates
+        frame[f"exit_date_{horizon}m"] = exit_dates
+        frame[f"holding_days_{horizon}m"] = holding_days
+        frame[f"future_buy_{horizon}m"] = future_buy_values
+        frame[f"future_sell_{horizon}m"] = future_sell_values
+        frame[f"net_return_{horizon}m"] = frame[f"future_buy_{horizon}m"] / frame["sell_price"] - 1
+        frame[f"gross_sell_return_{horizon}m"] = frame[f"future_sell_{horizon}m"] / frame["sell_price"] - 1
+        frame[f"future_drawdown_{horizon}m"] = pd.Series(future_min_buy_values, index=frame.index) / frame["sell_price"] - 1
+        frame[f"positive_return_{horizon}m"] = (frame[f"net_return_{horizon}m"] > 0).astype(float)
+        frame.loc[frame[f"net_return_{horizon}m"].isna(), f"positive_return_{horizon}m"] = np.nan
     return frame
 
 
@@ -411,9 +459,9 @@ def _add_lagged_features(frame: pd.DataFrame, config: ModelingConfig) -> tuple[p
         "GPRD",
         "GPRD_MA7",
         "GPRD_MA30",
-        "deposit_return_21d",
-        "deposit_return_63d",
-        "deposit_return_105d",
+        "deposit_return_1m",
+        "deposit_return_3m",
+        "deposit_return_5m",
     ]
     base_cols += [c for c in frame.columns if c.startswith(("event_count", "severity_", "channel_", "days_until_next_"))]
     base_cols += [c for c in frame.columns if c.startswith("raw_news_")]
@@ -481,10 +529,10 @@ def build_model_frame(config: ModelingConfig | None = None) -> pd.DataFrame:
     frame = _maybe_merge_news(frame, config, diagnostics)
     frame = _add_targets(frame, config.horizons)
     for horizon in config.horizons:
-        ret_col = f"deposit_return_{horizon}d"
-        target_col = f"net_return_{horizon}d"
-        if ret_col in frame.columns and target_col in frame.columns:
-            frame[f"gold_excess_return_vs_deposit_{horizon}d"] = frame[target_col] - frame[ret_col]
+        ret_col = f"deposit_return_{horizon}m"
+        target_name = _target_col(horizon)
+        if ret_col in frame.columns and target_name in frame.columns:
+            frame[f"gold_excess_return_vs_deposit_{horizon}m"] = frame[target_name] - frame[ret_col]
     frame, feature_cols = _add_lagged_features(frame, config)
     frame.attrs["feature_columns"] = feature_cols
     frame.attrs["diagnostics"] = diagnostics
@@ -587,7 +635,7 @@ def train_baselines(frame: pd.DataFrame, config: ModelingConfig | None = None) -
     predictions: list[dict[str, Any]] = []
     results: list[dict[str, Any]] = []
     for horizon in config.horizons:
-        target_col = f"net_return_{horizon}d"
+        target_col = _target_col(horizon)
         for fold_id, split in enumerate(splits, start=1):
             train_mask = (frame["date"] >= split["train_start"]) & (frame["date"] <= split["train_end"])
             test_mask = (frame["date"] >= split["test_start"]) & (frame["date"] <= split["test_end"])
@@ -603,12 +651,12 @@ def train_baselines(frame: pd.DataFrame, config: ModelingConfig | None = None) -
             for model_name, value in model_values.items():
                 pred = np.full(len(test), value)
                 met = _metrics(test[target_col].to_numpy(), pred)
-                results.append({"model": model_name, "horizon_days": horizon, "fold": fold_id, "phase": _phase_for_dates(test["date"], config).mode().iat[0], **met})
+                results.append({"model": model_name, "horizon_months": horizon, "fold": fold_id, "phase": _phase_for_dates(test["date"], config).mode().iat[0], **met})
                 for date_value, actual, pred_value, phase in zip(test["date"], test[target_col], pred, _phase_for_dates(test["date"], config)):
                     predictions.append(
                         {
                             "date": date_value,
-                            "horizon_days": horizon,
+                            "horizon_months": horizon,
                             "fold": fold_id,
                             "phase": phase,
                             "model": model_name,
@@ -644,7 +692,7 @@ def train_econometric(
     results: list[dict[str, Any]] = []
 
     for horizon in config.horizons:
-        target_col = f"net_return_{horizon}d"
+        target_col = _target_col(horizon)
         for fold_id, split in enumerate(bounded_splits, start=1):
             train_mask = (frame["date"] >= split["train_start"]) & (frame["date"] <= split["train_end"])
             test_mask = (frame["date"] >= split["test_start"]) & (frame["date"] <= split["test_end"])
@@ -661,12 +709,12 @@ def train_econometric(
                     fit = model.fit(disp=False, maxiter=35)
                     pred = np.asarray(fit.forecast(steps=len(test), exog=x_test))
                 met = _metrics(test[target_col].to_numpy(), pred)
-                results.append({"model": "sarimax_exog", "horizon_days": horizon, "fold": fold_id, "phase": _phase_for_dates(test["date"], config).mode().iat[0], **met})
+                results.append({"model": "sarimax_exog", "horizon_months": horizon, "fold": fold_id, "phase": _phase_for_dates(test["date"], config).mode().iat[0], **met})
                 for date_value, actual, pred_value, phase in zip(test["date"], test[target_col], pred, _phase_for_dates(test["date"], config)):
                     predictions.append(
                         {
                             "date": date_value,
-                            "horizon_days": horizon,
+                            "horizon_months": horizon,
                             "fold": fold_id,
                             "phase": phase,
                             "model": "sarimax_exog",
@@ -738,6 +786,7 @@ def train_ml_models(
             learning_rate=0.03,
             loss_function="RMSE",
             random_seed=config.random_state,
+            allow_writing_files=False,
             verbose=False,
         )
         optional_models["catboost_q10"] = CatBoostRegressor(
@@ -746,6 +795,7 @@ def train_ml_models(
             learning_rate=0.03,
             loss_function="Quantile:alpha=0.10",
             random_seed=config.random_state,
+            allow_writing_files=False,
             verbose=False,
         )
     except Exception as exc:
@@ -770,7 +820,7 @@ def train_ml_models(
     results: list[dict[str, Any]] = []
 
     for horizon in config.horizons:
-        target_col = f"net_return_{horizon}d"
+        target_col = _target_col(horizon)
         for fold_id, split in enumerate(splits, start=1):
             train_mask = (frame["date"] >= split["train_start"]) & (frame["date"] <= split["train_end"])
             test_mask = (frame["date"] >= split["test_start"]) & (frame["date"] <= split["test_end"])
@@ -788,12 +838,12 @@ def train_ml_models(
                     model.fit(x_train, y_train)
                     pred = np.asarray(model.predict(x_test), dtype=float)
                     met = _metrics(y_test.to_numpy(), pred)
-                    results.append({"model": model_name, "horizon_days": horizon, "fold": fold_id, "phase": phase_values.mode().iat[0], **met})
+                    results.append({"model": model_name, "horizon_months": horizon, "fold": fold_id, "phase": phase_values.mode().iat[0], **met})
                     for date_value, actual, pred_value, phase in zip(test["date"], y_test, pred, phase_values):
                         predictions.append(
                             {
                                 "date": date_value,
-                                "horizon_days": horizon,
+                                "horizon_months": horizon,
                                 "fold": fold_id,
                                 "phase": phase,
                                 "model": model_name,
@@ -819,7 +869,7 @@ def train_ml_models(
                     results.append(
                         {
                             "model": model_name,
-                            "horizon_days": horizon,
+                            "horizon_months": horizon,
                             "fold": fold_id,
                             "phase": phase_values.mode().iat[0],
                             "mae": np.nan,
@@ -832,7 +882,7 @@ def train_ml_models(
                         predictions.append(
                             {
                                 "date": date_value,
-                                "horizon_days": horizon,
+                                "horizon_months": horizon,
                                 "fold": fold_id,
                                 "phase": phase,
                                 "model": model_name,
@@ -882,9 +932,9 @@ def evaluate_decision_rules(
 
     best_models: dict[int, str] = {}
     for horizon in config.horizons:
-        subset = validation[validation["horizon_days"].eq(horizon)]
+        subset = validation[validation["horizon_months"].eq(horizon)]
         if subset.empty:
-            subset = mean_preds[mean_preds["horizon_days"].eq(horizon)]
+            subset = mean_preds[mean_preds["horizon_months"].eq(horizon)]
         if subset.empty:
             continue
         scored: dict[str, float] = {}
@@ -907,7 +957,7 @@ def evaluate_decision_rules(
 
     rows: list[pd.DataFrame] = []
     for horizon, model_name in best_models.items():
-        selected = mean_preds[(mean_preds["horizon_days"].eq(horizon)) & (mean_preds["model"].eq(model_name))].copy()
+        selected = mean_preds[(mean_preds["horizon_months"].eq(horizon)) & (mean_preds["model"].eq(model_name))].copy()
         if selected.empty:
             continue
         residual_std = float((selected["actual_net_return"] - selected["predicted_net_return"]).std(skipna=True))
@@ -915,15 +965,15 @@ def evaluate_decision_rules(
         selected["prob_return_positive"] = 1.0 - selected["predicted_net_return"].apply(lambda x: 0.5 * (1.0 + math.erf((0.0 - x) / (residual_std * math.sqrt(2)))))
 
         q10 = predictions[
-            predictions["horizon_days"].eq(horizon)
+            predictions["horizon_months"].eq(horizon)
             & predictions["prediction_type"].eq("q10")
             & predictions["model"].astype(str).str.contains("q10")
         ].copy()
         if not q10.empty:
-            q10 = q10.sort_values(["date", "model"]).drop_duplicates(["date", "horizon_days"], keep="first")
+            q10 = q10.sort_values(["date", "model"]).drop_duplicates(["date", "horizon_months"], keep="first")
             selected = selected.merge(
-                q10[["date", "horizon_days", "predicted_net_return"]].rename(columns={"predicted_net_return": "q10_predicted_net_return"}),
-                on=["date", "horizon_days"],
+                q10[["date", "horizon_months", "predicted_net_return"]].rename(columns={"predicted_net_return": "q10_predicted_net_return"}),
+                on=["date", "horizon_months"],
                 how="left",
             )
         else:
@@ -961,20 +1011,20 @@ def summarize_outputs(frame: pd.DataFrame, results: pd.DataFrame, signals: pd.Da
         "deposit_rate_non_null_values": deposit_non_null,
         "blockers": blockers,
     }
-    target_cols = [f"net_return_{h}d" for h in config.horizons]
+    target_cols = [_target_col(h) for h in config.horizons]
     summary["target_non_null"] = {c: int(frame[c].notna().sum()) for c in target_cols if c in frame}
     if not results.empty:
         leaderboard = (
             results[results["phase"].isin(["validation", "test"])]
-            .groupby(["model", "horizon_days"], as_index=False)
+            .groupby(["model", "horizon_months"], as_index=False)
             .agg(**{k: v for k, v in {"mae": ("mae", "mean"), "rmse": ("rmse", "mean"), "directional_accuracy": ("directional_accuracy", "mean"), "pinball_loss": ("pinball_loss", "mean")}.items() if k in results.columns})
-            .sort_values(["horizon_days", "mae"], na_position="last")
+            .sort_values(["horizon_months", "mae"], na_position="last")
         )
         summary["leaderboard"] = leaderboard.to_dict(orient="records")
     if not signals.empty:
         default = signals[(signals["prob_threshold"].eq(config.decision_prob_threshold)) & (signals["q10_floor"].eq(config.decision_q10_floor))]
         summary["decision_summary"] = (
-            default.groupby(["horizon_days", "phase"], as_index=False)
+            default.groupby(["horizon_months", "phase"], as_index=False)
             .agg(
                 signal_days=("buy_signal", "sum"),
                 observations=("buy_signal", "count"),
@@ -993,10 +1043,10 @@ def write_report(summary: dict[str, Any], config: ModelingConfig) -> Path:
 
     best_lines: list[str] = []
     if not leaderboard.empty:
-        for horizon, group in leaderboard.dropna(subset=["mae"]).groupby("horizon_days"):
+        for horizon, group in leaderboard.dropna(subset=["mae"]).groupby("horizon_months"):
             best = group.sort_values("mae").iloc[0]
             best_lines.append(
-                f"- Horizon {int(horizon)} ngày: `{best['model']}` có MAE return trung bình {best['mae']:.4f}, directional accuracy {best['directional_accuracy']:.2%}."
+                f"- Horizon {int(horizon)} tháng: `{best['model']}` có MAE return trung bình {best['mae']:.4f}, directional accuracy {best['directional_accuracy']:.2%}."
             )
     decision_lines: list[str] = []
     if not decision.empty:
@@ -1007,7 +1057,7 @@ def write_report(summary: dict[str, Any], config: ModelingConfig) -> Path:
                 else "n/a (không có ngày phát tín hiệu)"
             )
             decision_lines.append(
-                f"- {int(row['horizon_days'])} ngày, {row['phase']}: {int(row['signal_days'])}/{int(row['observations'])} ngày phát tín hiệu; return trung bình trên ngày mua {avg_buy_day_return}."
+                f"- {int(row['horizon_months'])} tháng, {row['phase']}: {int(row['signal_days'])}/{int(row['observations'])} ngày phát tín hiệu; return trung bình trên ngày mua {avg_buy_day_return}."
             )
 
     blockers = summary.get("blockers", [])
@@ -1016,7 +1066,7 @@ def write_report(summary: dict[str, Any], config: ModelingConfig) -> Path:
     text = f"""# VN Gold Decision Support: EDA, Literature Review Và Modeling
 
 ## Technical Summary
-- Bộ dữ liệu modeling có {summary['rows']:,} ngày, từ {summary['date_min']} đến {summary['date_max']}. Target chính là return sau spread: `buy_price_t+h / sell_price_t - 1` cho horizon 21, 63, 105 ngày.
+- Bộ dữ liệu modeling có {summary['rows']:,} ngày, từ {summary['date_min']} đến {summary['date_max']}. Target chính là return sau spread: `buy_price_exit / sell_price_t - 1` cho horizon 1, 3 và 5 tháng lịch.
 - Premium decomposition dùng được nhưng chưa hoàn hảo: tỷ lệ thiếu `premium` trong model frame là {summary['premium_missing_rate']:.1%}. Đây là caveat lớn nhất cho diễn giải premium.
 - Lãi suất tiền gửi VN bị loại khỏi feature set vì `deposit_rates_vn.csv` có `value` null 100%; opportunity cost chưa production-grade.
 - News được lấy từ `news_raw_headlines_vietnam_gold.csv` và chuyển thành các biến intensity/policy/premium/sentiment heuristic theo `event_date`, lag `t-1`; đây là event proxy, không phải sentiment real-time đã kiểm chứng.
@@ -1048,8 +1098,8 @@ Decision-rule mặc định dùng `P(net_return > 0) >= 0.60` và q10 return kh�
 ## Methodology
 1. Build a daily target from official SJC historical quotes, retaining buy/sell/mid/spread.
 2. Attach decomposition, global, GPR, macro, event and optional news features using as-of rules.
-3. Generate lag and rolling features over 1, 5, 10, 21, 63 and 105 days.
-4. Create labels for 21, 63 and 105-day net return, gross sell return and future drawdown.
+3. Generate lag and rolling features over 1, 5, 10, 21, 63 and 105 calendar days.
+4. Create labels for 1, 3 and 5 calendar-month net return, gross sell return and future drawdown using the nearest available exit price on or after the target date.
 5. Evaluate chronological expanding-window folds: train through 2022, then annual validation/test windows through 2026.
 6. Train naive baselines, SARIMAX, sklearn ML models and quantile models; optional XGBoost/LightGBM/deep models are used only if installed.
 7. Convert model forecasts into decision signals through probability and q10 downside thresholds.

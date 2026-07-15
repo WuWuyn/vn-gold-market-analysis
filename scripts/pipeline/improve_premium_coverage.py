@@ -34,8 +34,9 @@ OUT_PREMIUM = LAKE / "pipeline_output_premium_enriched.csv"
 AUDIT_CSV = QUALITY / "premium_coverage_audit.csv"
 SUMMARY_JSON = QUALITY / "premium_coverage_summary.json"
 
-CHI_PER_OZ = 31.1034768 / 1.205
-LUONG_PER_OZ = CHI_PER_OZ / 37.5
+TROY_OZ_GRAMS = 31.1034768
+GRAMS_PER_LUONG = 37.5
+OZ_PER_LUONG = GRAMS_PER_LUONG / TROY_OZ_GRAMS
 
 
 def read_csv(path: Path) -> pd.DataFrame:
@@ -200,7 +201,7 @@ def build_improved(args: argparse.Namespace) -> tuple[pd.DataFrame, dict[str, An
     out = asof_attach(domestic, gold_ref, "gold", args.gold_tolerance_days)
     out = asof_attach(out, fx_ref, "fx", args.fx_tolerance_days)
 
-    out["global_gold_vnd_per_luong"] = out["global_gold_usd_oz"] * out["usd_vnd"] / LUONG_PER_OZ
+    out["global_gold_vnd_per_luong"] = out["global_gold_usd_oz"] * out["usd_vnd"] * OZ_PER_LUONG
     missing = out["global_gold_vnd_per_luong"].isna()
     out.loc[missing, "premium"] = np.nan
     out.loc[~missing, "premium"] = out.loc[~missing, "sell_consensus"] - out.loc[~missing, "global_gold_vnd_per_luong"]

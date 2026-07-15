@@ -50,6 +50,7 @@ modeling = [
   "nbclient>=0.10",
   "statsforecast>=1.7",
   "mlforecast>=0.13",
+  "ftfy>=6.3",
   "lightgbm>=4.3",
   "xgboost>=2.0",
   "catboost>=1.2",

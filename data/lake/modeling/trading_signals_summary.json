@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-16 01:09:21.177219",
+  "generated_at": "2026-07-16 03:59:56.767515",
   "config": {
     "prob_threshold": 0.5,
     "q10_floor": -0.1,
@@ -8,7 +8,7 @@
   "phase_summary": [
     {
       "phase": "validation",
-      "horizon_d": 21,
+      "horizon_months": 1,
       "total_days": 365,
       "signal_days": 0,
       "signal_rate_%": 0.0,
@@ -20,71 +20,71 @@
     },
     {
       "phase": "validation",
-      "horizon_d": 63,
+      "horizon_months": 3,
       "total_days": 731,
-      "signal_days": 283,
-      "signal_rate_%": 38.71,
-      "signal_rows": 283,
+      "signal_days": 306,
+      "signal_rate_%": 41.86,
+      "signal_rows": 306,
       "fold_count": 1,
-      "avg_strategy_ret_%": -0.6153,
-      "avg_signal_day_ret_%": -0.6153,
+      "avg_strategy_ret_%": 1.4593,
+      "avg_signal_day_ret_%": 1.4593,
       "selected_model": "catboost_mean"
     },
     {
       "phase": "validation",
-      "horizon_d": 105,
+      "horizon_months": 5,
       "total_days": 731,
       "signal_days": 366,
       "signal_rate_%": 50.07,
       "signal_rows": 366,
       "fold_count": 1,
-      "avg_strategy_ret_%": 2.3678,
-      "avg_signal_day_ret_%": 2.3678,
+      "avg_strategy_ret_%": 7.0512,
+      "avg_signal_day_ret_%": 7.0512,
       "selected_model": "random_forest"
     },
     {
       "phase": "test",
-      "horizon_d": 21,
+      "horizon_months": 1,
       "total_days": 365,
-      "signal_days": 18,
-      "signal_rate_%": 4.93,
-      "signal_rows": 18,
+      "signal_days": 32,
+      "signal_rate_%": 8.77,
+      "signal_rows": 32,
       "fold_count": 1,
-      "avg_strategy_ret_%": 1.0019,
-      "avg_signal_day_ret_%": 1.0019,
+      "avg_strategy_ret_%": 1.3366,
+      "avg_signal_day_ret_%": 1.3366,
       "selected_model": "sarimax_exog"
     },
     {
       "phase": "test",
-      "horizon_d": 63,
-      "total_days": 494,
-      "signal_days": 149,
-      "signal_rate_%": 30.16,
-      "signal_rows": 149,
+      "horizon_months": 3,
+      "total_days": 466,
+      "signal_days": 328,
+      "signal_rate_%": 70.39,
+      "signal_rows": 328,
       "fold_count": 1,
-      "avg_strategy_ret_%": -4.9465,
-      "avg_signal_day_ret_%": -4.9465,
+      "avg_strategy_ret_%": 9.871,
+      "avg_signal_day_ret_%": 9.871,
       "selected_model": "catboost_mean"
     },
     {
       "phase": "test",
-      "horizon_d": 105,
-      "total_days": 452,
-      "signal_days": 449,
-      "signal_rate_%": 99.34,
-      "signal_rows": 449,
+      "horizon_months": 5,
+      "total_days": 407,
+      "signal_days": 407,
+      "signal_rate_%": 100.0,
+      "signal_rows": 407,
       "fold_count": 1,
-      "avg_strategy_ret_%": 12.7913,
-      "avg_signal_day_ret_%": 12.7913,
+      "avg_strategy_ret_%": 19.9545,
+      "avg_signal_day_ret_%": 19.9545,
       "selected_model": "random_forest"
     }
   ],
   "output_files": {
     "master": "C:\\Users\\admin\\Documents\\Lab Workplace\\vn-gold-market-analysis\\data\\lake\\modeling\\trading_signals.csv",
     "by_horizon": {
-      "21": "C:\\Users\\admin\\Documents\\Lab Workplace\\vn-gold-market-analysis\\data\\lake\\modeling\\trading_signals_21d.csv",
-      "63": "C:\\Users\\admin\\Documents\\Lab Workplace\\vn-gold-market-analysis\\data\\lake\\modeling\\trading_signals_63d.csv",
-      "105": "C:\\Users\\admin\\Documents\\Lab Workplace\\vn-gold-market-analysis\\data\\lake\\modeling\\trading_signals_105d.csv"
+      "1": "C:\\Users\\admin\\Documents\\Lab Workplace\\vn-gold-market-analysis\\data\\lake\\modeling\\trading_signals_1m.csv",
+      "3": "C:\\Users\\admin\\Documents\\Lab Workplace\\vn-gold-market-analysis\\data\\lake\\modeling\\trading_signals_3m.csv",
+      "5": "C:\\Users\\admin\\Documents\\Lab Workplace\\vn-gold-market-analysis\\data\\lake\\modeling\\trading_signals_5m.csv"
     }
   }
 }

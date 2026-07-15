@@ -293,10 +293,11 @@ Bỏ qua ngày |score| < 0.1 (noise)
 
 **Formula:**
 ```python
-CHI_PER_OZ = 31.1034768 / 1.205         # = 25.807 chi/oz
-LUONG_PER_OZ = CHI_PER_OZ / 37.5        # = 0.6886 luong/oz
+TROY_OZ_GRAMS = 31.1034768
+GRAMS_PER_LUONG = 37.5
+OZ_PER_LUONG = GRAMS_PER_LUONG / TROY_OZ_GRAMS  # = 1.20565 oz/luong
 
-global_gold_vnd_per_luong = lbma_usd_per_oz * usd_vnd_mid / LUONG_PER_OZ
+global_gold_vnd_per_luong = lbma_usd_per_oz * usd_vnd_mid * OZ_PER_LUONG
 premium = domestic_sell - global_gold_vnd_per_luong
 premium_pct = premium / global_gold_vnd_per_luong * 100
 consensus_mid = (buy + sell) / 2

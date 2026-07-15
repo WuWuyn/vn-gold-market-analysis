@@ -268,12 +268,13 @@ tet_proximity, than_tai, wedding_season, policy_auction, policy_import_change, p
 
 **Formula chuyển đổi (LUÔN dùng chung):**
 ```
-CHI_PER_OZ = 31.1034768 / 1.205        # = 25.807 chi/oz
-LUONG_PER_OZ = CHI_PER_OZ / 37.5        # = 0.6886 luong/oz
+TROY_OZ_GRAMS = 31.1034768
+GRAMS_PER_LUONG = 37.5
+OZ_PER_LUONG = GRAMS_PER_LUONG / TROY_OZ_GRAMS  # = 1.20565 oz/luong
 
 # LBMA USD/oz → VND/luong
-global_gold_vnd_per_luong = lbma_usd_oz × usd_vnd_mid / LUONG_PER_OZ
-// hoặc: lbma_usd_oz × usd_vnd_mid × (31.1035/1.205) / 37.5
+global_gold_vnd_per_luong = lbma_usd_oz × usd_vnd_mid × OZ_PER_LUONG
+// hoặc: lbma_usd_oz × usd_vnd_mid × 37.5 / 31.1034768
 
 // premium
 premium = domestic_sell - global_gold_vnd_per_luong

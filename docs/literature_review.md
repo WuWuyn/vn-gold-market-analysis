@@ -291,7 +291,7 @@ Based on this review, the recommended architecture for Vietnam gold forecasting 
     5. TFT (production candidate, if data justifies)
 
 [Target]
-    future_return_21d / future_return_63d / future_return_105d
+    net_return_1m / net_return_3m / net_return_5m
     (NOT price level — addresses extrapolation limitation)
 
 [Validation]

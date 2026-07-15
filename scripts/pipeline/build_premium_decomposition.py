@@ -29,22 +29,9 @@ from gold_collectors.full_pipeline import DataLakeWriter, date_range
 from gold_collectors.parsing import normalize_date, parse_number
 from gold_collectors.reliability import collect_historical_rows, accepted_historical_sources, read_registry
 
-LUONG_TO_CHI = 37.5 # 1 luong = 37.5 chi
-LUONG_TO_OZ = 0.03527395 # troy oz per chi (approx)
-
-# VND per ounce: 23.25 VND/chi * 37.5 chi/luong * 37.5 chi/luong... let's just use standard
-# 1 troy oz = 31.1034768 grams
-# 1 chi = 1.205 grams
-# So 1 oz / 1 chi = 31.1034768 / 1.205 = 25.807 chi/oz
-CHI_PER_OZ = 31.1034768 / 1.205 # ~25.807
-LUONG_PER_OZ = CHI_PER_OZ / 37.5 # ~0.688 chi/luong... wait
-
-# Standard: 1 luong = 37.5 chi (noi tai), 1 chi = 1.205 grams
-# 1 troy ounce = 31.1034768 grams
-# So 1 oz = (31.1034768 / 1.205) chi = 25.807 chi
-# And 1 luong = 37.5 chi
-# So 1 oz = 25.807 chi = 25.807 / 37.5 luong = 0.68856 luong
-LUONG_PER_OZ = CHI_PER_OZ / 37.5 # gold standard conversion in Vietnam
+TROY_OZ_GRAMS = 31.1034768
+GRAMS_PER_LUONG = 37.5
+OZ_PER_LUONG = GRAMS_PER_LUONG / TROY_OZ_GRAMS
 
 
 def parse_args():
@@ -157,11 +144,9 @@ def build_premium_table(args) -> int:
         # Calculate global gold in VND/luong
         global_gold_vnd_per_luong = None
         if global_gold_usd and usd_vnd:
-            # Convert: USD/oz * USD/VND = VND/oz
-            # Then VND/oz / chi_per_oz = VND/chi
-            # Then VND/chi * 37.5 = VND/luong
-            global_vnd_per_chi = global_gold_usd * usd_vnd / CHI_PER_OZ
-            global_gold_vnd_per_luong = global_vnd_per_chi * 37.5 # VND per luong
+            # Convert: USD/oz * USD/VND = VND/oz, then multiply by
+            # 37.5 grams per luong / 31.1034768 grams per troy ounce.
+            global_gold_vnd_per_luong = global_gold_usd * usd_vnd * OZ_PER_LUONG
 
         # Build consensus buy/sell from available sources
         buy_prices = []

@@ -95,7 +95,7 @@ Năm    Raw rows    Target rows    Pass rate    Ghi chú
 
 **Tại sao cần:**
 - `usd_vnd_mid` = cầu nối trực tiếp từ giá vàng USD → VND
-- Dùng để tính `global_gold_vnd_per_luong = lbma_usd_oz × usd_vnd_mid / LUONG_PER_OZ`
+- Dùng để tính `global_gold_vnd_per_luong = lbma_usd_oz × usd_vnd_mid × 37.5 / 31.1034768`
 - SBV central = chính thức; Vietcombank = thị trường thực (retail rate)
 
 **Thiếu sót:**
@@ -285,9 +285,9 @@ Curated subset từ macro_series — chỉ giữ high-signal indicators cho fore
 
 **Formula:**
 ```
-LUONG_PER_OZ = (31.1035g / 1.205g/chi) / 37.5 chi/luong = 0.6886 luong/oz
+OZ_PER_LUONG = 37.5g/luong / 31.1034768g/oz = 1.20565 oz/luong
 
-global_gold_vnd_per_luong = lbma_usd_per_oz × usd_vnd_mid / LUONG_PER_OZ
+global_gold_vnd_per_luong = lbma_usd_per_oz × usd_vnd_mid × OZ_PER_LUONG
 premium_vnd = domestic_sell - global_gold_vnd_per_luong
 premium_pct = premium_vnd / global_gold_vnd_per_luong × 100
 ```

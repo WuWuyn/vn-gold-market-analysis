@@ -1,15 +1,15 @@
 {
-  "generated_at": "2026-07-15T18:13:02.621294+00:00",
+  "generated_at": "2026-07-15T21:14:23.517793+00:00",
   "rows": 3,
-  "buy_rows": 1,
-  "open_rows": 1,
+  "buy_rows": 2,
+  "open_rows": 2,
   "closed_rows": 0,
-  "no_position_rows": 2,
+  "no_position_rows": 1,
   "date_min": "2026-07-11",
   "date_max": "2026-07-11",
   "by_horizon": [
     {
-      "horizon_days": 21,
+      "horizon_months": 1,
       "rows": 1,
       "buy_rows": 0,
       "open_rows": 0,
@@ -18,16 +18,16 @@
       "hit_rate": null
     },
     {
-      "horizon_days": 63,
+      "horizon_months": 3,
       "rows": 1,
-      "buy_rows": 0,
-      "open_rows": 0,
+      "buy_rows": 1,
+      "open_rows": 1,
       "closed_rows": 0,
       "avg_realized_net_return": null,
       "hit_rate": null
     },
     {
-      "horizon_days": 105,
+      "horizon_months": 5,
       "rows": 1,
       "buy_rows": 1,
       "open_rows": 1,
