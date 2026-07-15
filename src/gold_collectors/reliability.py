@@ -442,8 +442,16 @@ def collect_giavang_rows(provider: str, requested_date: str, http: CachedHttpCli
     for table_row in extract_table_rows(response.text):
         if len(table_row) < 4:
             continue
-        buy = parse_number(table_row[2])
-        sell = parse_number(table_row[3])
+        raw_buy = parse_number(table_row[2])
+        raw_sell = parse_number(table_row[3])
+        if raw_buy is None or raw_sell is None:
+            continue
+        # PNJ history pages sometimes have swapped column order (Sell at [2], Buy at [3]).
+        # If raw_buy >> raw_sell by more than 1M, swap them.
+        if raw_buy > raw_sell:
+            raw_buy, raw_sell = raw_sell, raw_buy
+        buy = raw_buy
+        sell = raw_sell
         if buy is None or sell is None:
             continue
         business_date = requested_date

@@ -45,7 +45,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Collect external feature sources aligned by date.")
     parser.add_argument("--from", dest="from_date", default="2011-07-06")
     parser.add_argument("--to", dest="to_date", default="2026-07-06")
-    parser.add_argument("--out-dir", default="data/lake/market_data/v1")
+    parser.add_argument("--out-dir", default="data/lake")
     parser.add_argument("--format", default="parquet,csv")
     parser.add_argument("--timeout", type=int, default=12)
     parser.add_argument("--retries", type=int, default=0)
@@ -72,7 +72,7 @@ def main() -> int:
         sys.stdout.reconfigure(encoding="utf-8")
     args = parse_args()
     out_dir = Path(args.out_dir)
-    writer = DataLakeWriter(out_dir, formats=args.format.split(","))
+    writer = DataLakeWriter(out_dir, formats=args.format.split(","), flat=True)
     http = CachedHttpClient(cache_dir=out_dir / "raw" / "http_cache", timeout_seconds=args.timeout, retries=args.retries, min_interval_seconds=0.35)
 
     datasets = {

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Integrate PNJ and other archive sources into domestic_gold_quotes.csv.
+Integrate PNJ and other archive sources into gold_quotes_sjc_historical.csv.
 
 Expands the audited dataset from 28K rows (SJC only) to ~95K+ rows by including:
 - webgia_sjc_archive (24,994 rows)
@@ -45,14 +45,14 @@ ELIGIBLE_SOURCES = {
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Integrate archive sources into audited domestic gold quotes.")
-    p.add_argument("--raw-dir", default="data/lake/raw_gold_15y")
-    p.add_argument("--audited-dir", default="data/lake/domestic_target")
-    p.add_argument("--out-dir", default="data/lake/domestic_target")
+    p.add_argument("--raw-dir", default="data/lake")
+    p.add_argument("--audited-dir", default="data/lake")
+    p.add_argument("--out-dir", default="data/lake")
     return p.parse_args()
 
 
 def integrate(args: argparse.Namespace) -> int:
-    raw_csv = Path(args.raw_dir) / "normalized" / "raw_gold_history.csv"
+    raw_csv = Path(args.raw_dir) / "raw_gold_history.csv"
     if not raw_csv.exists():
         print(f"ERROR: {raw_csv} not found")
         return 1
@@ -113,7 +113,7 @@ def integrate(args: argparse.Namespace) -> int:
     out_dir = Path(args.out_dir)
     out_norm = out_dir / "normalized"
     out_norm.mkdir(parents=True, exist_ok=True)
-    out_csv = out_norm / "domestic_gold_quotes.csv"
+    out_csv = out_norm / "gold_quotes_sjc_historical.csv"
 
     with open(out_csv, "w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)

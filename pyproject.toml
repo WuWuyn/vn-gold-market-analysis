@@ -39,6 +39,28 @@ agentic = [
 dev = [
   "pytest>=8",
 ]
+modeling = [
+  "numpy>=1.26",
+  "scipy>=1.12",
+  "matplotlib>=3.8",
+  "seaborn>=0.13",
+  "scikit-learn>=1.4",
+  "statsmodels>=0.14",
+  "nbformat>=5.10",
+  "nbclient>=0.10",
+  "statsforecast>=1.7",
+  "mlforecast>=0.13",
+  "lightgbm>=4.3",
+  "xgboost>=2.0",
+  "catboost>=1.2",
+  "shap>=0.45",
+]
+deep-learning = [
+  "torch>=2.3",
+  "lightning>=2.2",
+  "pytorch-forecasting>=1.0",
+  "gluonts>=0.14",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

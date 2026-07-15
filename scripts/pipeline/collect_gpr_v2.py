@@ -2,7 +2,7 @@
 """Geopolitical Risk (GPR) daily index via GDELT 2.0 Events API.
 
 Falls back to yfinance VIX as proxy if GDELT is unreachable.
-Output: data/lake/market_data/v2/normalized/gpr_daily.csv
+Output: data/lake/gpr_daily.csv
 """
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ GDELT_QUERY = (
     "eventroottype:07"  # fight/attack or related categories — keep broad
 )
 
-OUT_DIR = Path("data/lake/market_data/v2")
+OUT_DIR = Path("data/lake")
 NORMALIZED = OUT_DIR / "normalized"
 NORMALIZED.mkdir(parents=True, exist_ok=True)
 

@@ -1,8 +1,0 @@
-available_from,event_date,event_type,expected_channel,note,scope,severity,source
-2024-03-14,2024-03-14,policy_auction,premium_shrink,NHNN restarts gold auction after 11-year hiatus (Decision 319/QD-NHNN),domestic_vietnam,high,manual_curation
-2024-06-14,2024-06-14,policy_auction,premium_shrink,5th NHNN gold auction — 300 taels sold at floor price,domestic_vietnam,medium,manual_curation
-2025-01-03,2025-01-03,policy_rate_increase,premium_shrink,SBV raised refinance rate 4.5% -> 5.0% — first hike in years,domestic_vietnam,high,manual_curation
-2015-01-05,2015-01-05,geopolitical_crisis,premium_spike,"NĐ devaluation ~2% — major VND shock, domestic gold surged",global,high,manual_curation
-2022-03-08,2022-03-08,geopolitical_crisis,premium_spike,Russia-Ukraine war started — safe haven demand spike,global,high,manual_curation
-2024-07-18,2024-07-18,policy_import,liquidity_improve,SBV imported additional gold to boost domestic supply,domestic_vietnam,medium,manual_curation
-2024-11-18,2024-11-18,policy_import,liquidity_improve,SBV 2nd gold import batch announced — 20 tonnes,domestic_vietnam,medium,manual_curation

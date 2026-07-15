@@ -32,9 +32,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 LAKE_OUTPUT_DIRS = [
     PROJECT_ROOT / "data/lake/modeling",
     PROJECT_ROOT / "data/lake/gold_prices",
-    PROJECT_ROOT / "data/lake/market_data/v2/normalized",
-    PROJECT_ROOT / "data/lake/market_data/v1/normalized",
-    PROJECT_ROOT / "data/lake/raw_gold_15y/normalized",
+    PROJECT_ROOT / "data/lake/normalized",
+    PROJECT_ROOT / "data/lake/normalized",
+    PROJECT_ROOT / "data/lake/normalized",
 ]
 BACKUP_DIR = PROJECT_ROOT / ".github/build-logs/backups"
 MANIFEST_PATH = BACKUP_DIR / "quarantine_manifest.json"

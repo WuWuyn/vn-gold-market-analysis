@@ -72,7 +72,7 @@ def widest_csv(target_override: str | None = None) -> tuple[int, Path, str]:
     if target_override:
         matches = [t for t in _OUTPUT_REGISTRY if t[0] == target_override]
         if not matches:
-            sys.exit(f"[recover] fatal: '{target_override}' not found in data/lake/**/normalized/")
+            sys.exit(f"[recover] fatal: '{target_override}' not found in data/lake/**/")
         _, path, n_cols = matches[0]
     else:
         if not _OUTPUT_REGISTRY:

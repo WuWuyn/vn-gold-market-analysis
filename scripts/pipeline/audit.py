@@ -22,8 +22,8 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 _ROOT = _SCRIPT_DIR.parent.parent
 _V1 = _ROOT / "data" / "lake" / "market_data" / "v1" / "normalized"
 _V2 = _ROOT / "data" / "lake" / "market_data" / "v2" / "normalized"
-_ENR = _ROOT / "data" / "lake" / "gold_prices"
-_AUD = _ROOT / "data" / "lake" / "domestic_target" / "normalized"
+_ENR = _ROOT / "data" / "lake"
+_AUD = _ROOT / "data" / "lake" / "gold_quotes_sjc_historical.csv"
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -60,7 +60,7 @@ def audit_fx(_args: argparse.Namespace) -> None:
 
 def audit_fx_source(_args: argparse.Namespace) -> None:
     """Verify which FX source is used per enriched gold row and cross-check SBV vs yfinance."""
-    enriched = _read_csv(_ENR / "gold_daily_enriched.csv")
+    enriched = _read_csv(_ENR / "pipeline_output_premium_enriched.csv")
     fx_rows = _read_csv(_V1 / "fx_rates.csv")
     gms_rows = _read_csv(_V1 / "global_market_series.csv")
 
@@ -95,7 +95,7 @@ def audit_fx_source(_args: argparse.Namespace) -> None:
 
 def audit_premium(_args: argparse.Namespace) -> None:
     """Premium distribution, unit consistency, GC=F source check, FX coverage."""
-    enriched = _read_csv(_ENR / "gold_daily_enriched.csv")
+    enriched = _read_csv(_ENR / "pipeline_output_premium_enriched.csv")
 
     # ── A1: distribution by year ──────────────────────────────────────────────
     print("=" * 70)
@@ -178,9 +178,9 @@ def audit_enriched(_args: argparse.Namespace) -> None:
     """Full gap analysis across enriched, event panel, FRED v2, futures, ETF, FX, audited."""
     # ── 1. enriched overview ──────────────────────────────────────────────────
     print("=" * 70)
-    print("1. gold_daily_enriched.csv — PREMIUM DECOMPOSITION")
+    print("1. pipeline_output_premium_enriched.csv — PREMIUM DECOMPOSITION")
     print("=" * 70)
-    enriched = _read_csv(_ENR / "gold_daily_enriched.csv")
+    enriched = _read_csv(_ENR / "pipeline_output_premium_enriched.csv")
     dates = sorted(r["date"] for r in enriched)
     print(f"  date range: {dates[0]} -> {dates[-1]} ({len(dates)} unique)")
     print(f"  total rows: {len(enriched)}, columns: {list(enriched[0].keys())}")
@@ -287,10 +287,10 @@ def audit_enriched(_args: argparse.Namespace) -> None:
 
     # ── 7. audited ────────────────────────────────────────────────────────────
     print("\n" + "=" * 70)
-    print("7. audited/normalized/domestic_gold_quotes.csv")
+    print("7. audited/gold_quotes_sjc_historical.csv")
     print("=" * 70)
     try:
-        aud = _read_csv(_AUD / "domestic_gold_quotes.csv")
+        aud = _read_csv(_AUD / "gold_quotes_sjc_historical.csv")
         src_counts = Counter(r["source"] for r in aud)
         print(f"  rows: {len(aud)}, sources: {dict(src_counts)}")
         print(f"  date range: {min(r['date'] for r in aud)} -> {max(r['date'] for r in aud)}")

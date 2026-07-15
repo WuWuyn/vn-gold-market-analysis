@@ -8,7 +8,7 @@ Materializes:
 - spread_pct: (sell - buy) / sell
 - consensus_mid: (buy + sell) / 2
 
-Outputs to data/lake/gold_prices/
+Outputs to data/lake/
 """
 from __future__ import annotations
 
@@ -49,9 +49,9 @@ LUONG_PER_OZ = CHI_PER_OZ / 37.5 # gold standard conversion in Vietnam
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Build premium decomposition table.")
-    parser.add_argument("--audited-dir", default="data/lake/domestic_target")
-    parser.add_argument("--external-dir", default="data/lake/market_data/v1")
-    parser.add_argument("--out-dir", default="data/lake/gold_prices")
+    parser.add_argument("--audited-dir", default="data/lake")
+    parser.add_argument("--external-dir", default="data/lake")
+    parser.add_argument("--out-dir", default="data/lake")
     parser.add_argument("--registry", default="configs/source_registry_audited.yaml")
     return parser.parse_args()
 
@@ -68,10 +68,10 @@ def build_premium_table(args) -> int:
     audited = Path(args.audited_dir)
     external = Path(args.external_dir)
     out_dir = Path(args.out_dir)
-    writer = DataLakeWriter(out_dir, formats=["csv"])
+    writer = DataLakeWriter(out_dir, formats=["csv"], flat=True)
 
     # Load domestic gold quotes
-    gold_rows = load_csv_rows(audited / "normalized" / "domestic_gold_quotes.csv")
+    gold_rows = load_csv_rows(audited / "domestic_gold_quotes.csv")
     print(f"Loaded {len(gold_rows)} domestic gold rows")
 
     # Index by date and source
@@ -81,8 +81,8 @@ def build_premium_table(args) -> int:
         by_date_source[key] = row
 
     # Load external features for LBMA gold and FX
-    global_market = load_csv_rows(external / "normalized" / "global_market_series.csv")
-    fx_rates = load_csv_rows(external / "normalized" / "fx_rates.csv")
+    global_market = load_csv_rows(external / "global_market_series_yfinance_fred.csv")
+    fx_rates = load_csv_rows(external / "global_reference_daily.csv")
 
     # Index global market by date and series
     global_by_date: dict[str, dict[str, dict]] = {}
@@ -240,7 +240,7 @@ def build_premium_table(args) -> int:
     (out_dir / "manifests" / "enrichment_manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
     )
-    print(f"Output: {out_dir}/normalized/gold_daily_enriched.csv ({len(enriched)} rows)")
+    print(f"Output: {out_dir}/gold_daily_enriched.csv ({len(enriched)} rows)")
     return 0
 
 

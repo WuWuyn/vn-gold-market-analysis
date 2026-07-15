@@ -5,7 +5,7 @@ Strategies:
   Primary: Google News RSS with date-range queries (quarterly chunks back to 2010)
   Fallback: yfinance Ticker.news (last ~2 weeks only)
 
-Output: data/lake/market_data/v2/normalized/news_sentiment.csv
+Output: data/lake/news_sentiment.csv
 """
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
-OUT_DIR = Path("data/lake/market_data/v2")
+OUT_DIR = Path("data/lake")
 NORMALIZED = OUT_DIR / "normalized"
 NORMALIZED.mkdir(parents=True, exist_ok=True)
 
