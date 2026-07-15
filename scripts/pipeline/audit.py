@@ -287,7 +287,7 @@ def audit_enriched(_args: argparse.Namespace) -> None:
 
     # ── 7. audited ────────────────────────────────────────────────────────────
     print("\n" + "=" * 70)
-    print("7. audited/normalized/gold_quotes_sjc_historical.csv")
+    print("7. audited/gold_quotes_sjc_historical.csv")
     print("=" * 70)
     try:
         aud = _read_csv(_AUD / "gold_quotes_sjc_historical.csv")

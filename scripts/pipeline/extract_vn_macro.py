@@ -11,7 +11,7 @@ only the most predictive indicators:
   - Imports CIF (monthly — proxy for gold demand via customs)
   - VN stock index end-of-period (monthly — sentiment proxy)
 
-Output: data/lake/normalized/vn_macro_forecasting.csv
+Output: data/lake/vn_macro_forecasting.csv
 
 All rows use `available_from` = observation date.
 CRITICAL: join by `available_from` (NOT `observation_date`) to prevent
@@ -155,7 +155,7 @@ def main() -> int:
     out_dir = Path(args.out_dir)
     norm = out_dir / "normalized"
     norm.mkdir(parents=True, exist_ok=True)
-    writer = DataLakeWriter(out_dir, formats=["csv"])
+    writer = DataLakeWriter(out_dir, formats=["csv"], flat=True)
 
     statuses: list[MacroExtractStatus] = []
     try:

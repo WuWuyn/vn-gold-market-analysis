@@ -52,7 +52,7 @@ def main() -> int:
     data_lake = Path(args.data_lake)
     report_dir = data_lake / "reports"
     report_dir.mkdir(parents=True, exist_ok=True)
-    rows = read_csv(data_lake / "normalized" / "gold_quotes_sjc_historical.csv")
+    rows = read_csv(data_lake / "gold_quotes_sjc_historical.csv")
     registry = read_registry(args.registry)
 
     write_source_reliability(report_dir / "source_reliability.csv", registry)

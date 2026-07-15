@@ -6,7 +6,7 @@ Uses urllib + regex only. No Playwright needed.
 Sources: Google News RSS, Kitco RSS, Investing.com RSS, goldprice.org,
          yfinance news, nhipcaudautu.vn direct articles.
 
-Output: data/lake/normalized/news_raw_headlines_vietnam_gold.csv
+Output: data/lake/news_raw_headlines_vietnam_gold.csv
 Columns: crawl_date, event_date, headline, body_text, url, source, category, query_used
 """
 import csv, sys, re, json
@@ -18,7 +18,7 @@ from collections import Counter
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-OUT = Path("data/lake/normalized/news_raw_headlines_vietnam_gold.csv")
+OUT = Path("data/lake/news_raw_headlines_vietnam_gold.csv")
 MANIFEST = OUT.parent / "manifests" / "vn_news_raw_manifest.json"
 OUT.parent.mkdir(parents=True, exist_ok=True)
 MANIFEST.parent.mkdir(parents=True, exist_ok=True)

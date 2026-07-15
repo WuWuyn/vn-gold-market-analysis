@@ -52,7 +52,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def integrate(args: argparse.Namespace) -> int:
-    raw_csv = Path(args.raw_dir) / "normalized" / "raw_gold_history.csv"
+    raw_csv = Path(args.raw_dir) / "raw_gold_history.csv"
     if not raw_csv.exists():
         print(f"ERROR: {raw_csv} not found")
         return 1

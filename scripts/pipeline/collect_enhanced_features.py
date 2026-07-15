@@ -9,7 +9,7 @@ yfinance Ticker: GLD ETF, GC=F futures, GLD shares outstanding (SEC XBRL + snaps
 
 crawl4ai: LBMA Gold Fix (intercepts Next.js data fetch).
 
-SBV headless JSON CMS: VN deposit rates (content structure 137473).
+SBV/NHNN interest-rate sources must be discovered with Playwright first.
 """
 from __future__ import annotations
 
@@ -381,98 +381,41 @@ def collect_gld_shares_historical(from_date: str, to_date: str) -> list[dict[str
     return rows
 
 # ---------------------------------------------------------------------------
-# SBV deposit rates
+# SBV deposit / interest rates
 # ---------------------------------------------------------------------------
-_VN_DEPOSIT_CONTENT_STRUCTURE_ID = "137473"
+_VN_DEPOSIT_CONTENT_STRUCTURE_ID = ""
 
 def collect_vietnam_deposit_rates() -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    url = (
-        f"https://www.sbv.gov.vn/vi/o/headless-delivery/v1.0/content-structures/"
-        f"{_VN_DEPOSIT_CONTENT_STRUCTURE_ID}/structured-contents"
-        f"?pageSize=50&sort=datePublished:desc"
+    discovery_path = Path("data/lake/source_discovery/sbv_structures.json")
+    if discovery_path.exists():
+        try:
+            discovered = json.loads(discovery_path.read_text(encoding="utf-8"))
+        except Exception:
+            discovered = []
+        candidates = [
+            r for r in discovered
+            if r.get("classification") == "interest_rate_candidate"
+            and str(r.get("content_structure_id", "")) != "137473"
+        ]
+        if candidates:
+            print(
+                " SBV deposit rates: candidate structures found but field semantics "
+                "are not yet verified: "
+                + ", ".join(str(c.get("content_structure_id")) for c in candidates)
+            )
+        else:
+            print(
+                " SBV deposit rates: no verified interest-rate structure found; "
+                "skipping to avoid mislabeling central FX as deposit rates"
+            )
+        return rows
+
+    print(
+        " SBV deposit rates: skipped. Run scripts/pipeline/discover_sbv_sources.py; "
+        "structure 137473 is central USD/VND FX, not deposit rates."
     )
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36"
-        ),
-        "Accept": "application/json",
-        "X-Requested-With": "XMLHttpRequest",
-    }
-    try:
-        req = _url_request.Request(url, headers=headers)
-        with _url_request.urlopen(req, timeout=20) as resp:
-            raw = resp.read()
-            payload = json.loads(raw.decode("utf-8", errors="replace"))
-            raw_hash = hashlib.sha256(raw).hexdigest()
-    except Exception as exc:
-        print(f" SBV deposit rates API: {type(exc).__name__}: {exc}")
-        return rows
-
-    items = payload.get("items", [])
-    if not items:
-        print(" SBV deposit rates API: empty response")
-        return rows
-
-    print(f" SBV deposit rates API: {len(items)} items")
-
-    # Print first 3 items' field names for debugging
-    seen_fields: set[str] = set()
-    for item in items[:3]:
-        for f in item.get("contentFields", []):
-            fn = f.get("name", "")
-            if fn:
-                seen_fields.add(fn)
-    print(f" SBV field names: {sorted(seen_fields)}")
-
-    for item in items:
-        fields: dict[str, str] = {}
-        for field in item.get("contentFields", []):
-            value = field.get("contentFieldValue") or {}
-            fields[field.get("name", "")] = str(value.get("data", "") or "")
-
-        pub_date = item.get("datePublished", "")[:10]
-        if not pub_date:
-            continue
-
-        rate_value = _parse_sbv_rate_text(fields)
-        doc_number = (
-            fields.get("SoVanBan")
-            or fields.get("SoVanBanThongBao")
-            or fields.get("So_van_ban")
-            or fields.get("so_van_ban")
-            or ""
-        )
-        title = str(item.get("title", ""))[:80]
-
-        rows.append(
-            {
-                "date": pub_date,
-                "source": "sbv_deposit_rates_json",
-                "series_id": "SBV_DEPOSIT_RATES",
-                "asset": "vn_deposit_rates",
-                "value": rate_value,
-                "unit": "pct",
-                "document_number": doc_number,
-                "published_at": item.get("datePublished"),
-                "available_from": pub_date,
-                "raw_hash": raw_hash,
-                "note": f"fields={','.join(sorted(fields.keys())[:5])}",
-                "title": title,
-            }
-        )
-
-    seen: set[tuple[str, str]] = set()
-    unique: list[dict[str, Any]] = []
-    for r in rows:
-        key = (r["date"], r.get("document_number", ""))
-        if key not in seen:
-            seen.add(key)
-            unique.append(r)
-    non_null = sum(1 for r in unique if r.get("value") is not None)
-    print(f" SBV deposit rates: {len(unique)} unique, {non_null} with non-null value")
-    return unique
+    return rows
 
 def _parse_sbv_rate_text(fields: dict[str, str]) -> float | None:
     """Extract rate from SBV content fields.

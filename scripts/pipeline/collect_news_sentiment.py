@@ -5,7 +5,7 @@ Strategies:
   Primary: Google News RSS with date-range queries (quarterly chunks back to 2010)
   Fallback: yfinance Ticker.news (last ~2 weeks only)
 
-Output: data/lake/normalized/news_sentiment.csv
+Output: data/lake/news_sentiment.csv
 """
 from __future__ import annotations
 

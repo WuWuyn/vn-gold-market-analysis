@@ -51,7 +51,7 @@ def main() -> int:
     registry = read_registry(args.registry)
     allowed_sources = accepted_historical_sources(registry)
     out_dir = Path(args.out_dir)
-    writer = DataLakeWriter(out_dir, formats=args.format.split(","))
+    writer = DataLakeWriter(out_dir, formats=args.format.split(","), flat=True)
     cache_dir = args.cache_dir or str(out_dir / "raw" / "http_cache")
     http = CachedHttpClient(cache_dir=cache_dir, timeout_seconds=args.timeout, retries=args.retries, min_interval_seconds=0.35)
 
@@ -93,7 +93,7 @@ def main() -> int:
         "historical_valid_sources": sorted(allowed_sources),
         "accepted_records": len(rows),
         "leakage_or_empty_flags": len(leakage_rows),
-        "target_csv": str(out_dir / "normalized" / "gold_quotes_sjc_historical.csv"),
+        "target_csv": str(out_dir / "gold_quotes_sjc_historical.csv"),
     }
     (out_dir / "reports" / "backfill_summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(summary, ensure_ascii=False, indent=2))

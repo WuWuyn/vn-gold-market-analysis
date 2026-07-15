@@ -667,7 +667,7 @@ def main(argv=None) -> int:
     for et in sorted(set(e["event_type"] for e in unique)):
         n = sum(1 for e in unique if e["event_type"] == et)
         print(f"  {et}: {n}")
-    print(f"Output: {args.out_dir}/normalized/gold_event_panel.csv")
+    print(f"Output: {args.out_dir}/gold_event_panel.csv")
     return 0
 
 if __name__ == "__main__":

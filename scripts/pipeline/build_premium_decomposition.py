@@ -68,10 +68,10 @@ def build_premium_table(args) -> int:
     audited = Path(args.audited_dir)
     external = Path(args.external_dir)
     out_dir = Path(args.out_dir)
-    writer = DataLakeWriter(out_dir, formats=["csv"])
+    writer = DataLakeWriter(out_dir, formats=["csv"], flat=True)
 
     # Load domestic gold quotes
-    gold_rows = load_csv_rows(audited / "normalized" / "domestic_gold_quotes.csv")
+    gold_rows = load_csv_rows(audited / "domestic_gold_quotes.csv")
     print(f"Loaded {len(gold_rows)} domestic gold rows")
 
     # Index by date and source
@@ -81,8 +81,8 @@ def build_premium_table(args) -> int:
         by_date_source[key] = row
 
     # Load external features for LBMA gold and FX
-    global_market = load_csv_rows(external / "normalized" / "global_market_series.csv")
-    fx_rates = load_csv_rows(external / "normalized" / "fx_rates.csv")
+    global_market = load_csv_rows(external / "global_market_series_yfinance_fred.csv")
+    fx_rates = load_csv_rows(external / "global_reference_daily.csv")
 
     # Index global market by date and series
     global_by_date: dict[str, dict[str, dict]] = {}
@@ -240,7 +240,7 @@ def build_premium_table(args) -> int:
     (out_dir / "manifests" / "enrichment_manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
     )
-    print(f"Output: {out_dir}/normalized/gold_daily_enriched.csv ({len(enriched)} rows)")
+    print(f"Output: {out_dir}/gold_daily_enriched.csv ({len(enriched)} rows)")
     return 0
 
 

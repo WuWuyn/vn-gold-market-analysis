@@ -268,7 +268,7 @@ def main() -> int:
     out_dir = Path(args.out_dir)
     norm = out_dir / "normalized"
     norm.mkdir(parents=True, exist_ok=True)
-    writer = DataLakeWriter(out_dir, formats=["csv"])
+    writer = DataLakeWriter(out_dir, formats=["csv"], flat=True)
 
     try:
         rows = collect_news_rss(args.from_date, args.to_date, args.timeout)

@@ -390,7 +390,7 @@ def date_range(start: str, end: str) -> list[str]:
 def main() -> int:
     args = parse_args()
     out_dir = Path(args.out_dir)
-    writer = DataLakeWriter(out_dir, formats=["csv"])
+    writer = DataLakeWriter(out_dir, formats=["csv"], flat=True)
 
     events: list[dict] = []
 
@@ -435,7 +435,7 @@ def main() -> int:
     )
     print(f"\nTotal unique events: {len(unique)}")
     print(f"By type: {manifest['event_types']}")
-    print(f"Output: {out_dir}/normalized/gold_event_panel.csv")
+    print(f"Output: {out_dir}/gold_event_panel.csv")
     return 0
 
 

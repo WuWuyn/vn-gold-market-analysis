@@ -72,7 +72,7 @@ def main() -> int:
         sys.stdout.reconfigure(encoding="utf-8")
     args = parse_args()
     out_dir = Path(args.out_dir)
-    writer = DataLakeWriter(out_dir, formats=args.format.split(","))
+    writer = DataLakeWriter(out_dir, formats=args.format.split(","), flat=True)
     http = CachedHttpClient(cache_dir=out_dir / "raw" / "http_cache", timeout_seconds=args.timeout, retries=args.retries, min_interval_seconds=0.35)
 
     datasets = {

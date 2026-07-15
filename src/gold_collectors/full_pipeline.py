@@ -37,11 +37,23 @@ class DataQualityIssue:
 
 
 class DataLakeWriter:
-    def __init__(self, root: str | Path, formats: Iterable[str] = ("parquet", "csv")):
+    def __init__(
+        self,
+        root: str | Path,
+        formats: Iterable[str] = ("parquet", "csv"),
+        flat: bool = False,
+    ):
+        """Args:
+        root: base directory
+        formats: output formats
+        flat: if True, write normalized/ output directly into root
+              (no normalized/ subdirectory). Useful for flat data lakes.
+        """
         self.root = Path(root)
+        self.flat = flat
         self.formats = {item.strip().lower() for item in formats if item.strip()}
         self.raw_dir = self.root / "raw"
-        self.normalized_dir = self.root / "normalized"
+        self.normalized_dir = self.root if flat else self.root / "normalized"
         self.manifest_dir = self.root / "manifests"
         self.report_dir = self.root / "reports"
         for path in (self.raw_dir, self.normalized_dir, self.manifest_dir, self.report_dir):

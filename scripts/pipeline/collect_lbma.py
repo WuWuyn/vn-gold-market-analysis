@@ -8,7 +8,7 @@ No auth required. Returns AM + PM fix prices in USD/GBP/EUR.
 Limitation: only TODAY's data is available (not historical archive).
 This collector should be run daily to build a time series.
 
-Output: data/lake/normalized/lbma_gold_spot_am_pm.csv
+Output: data/lake/lbma_gold_spot_am_pm.csv
 """
 from __future__ import annotations
 

@@ -67,13 +67,12 @@ from gold_collectors.full_pipeline import DataLakeWriter  # noqa: E402
 # ── Constants ──────────────────────────────────────────────────────────────
 ROOT = Path(__file__).resolve().parents[2]  # project root
 LAKE = ROOT / "data" / "lake"
-ENRICHED = LAKE / "enriched"
 GOLD_PRICES = LAKE  # kept for backward compat in comments
 RAW_GOLD = LAKE / "gold_raw_history_all_sources_2010_2026.csv"
 AUDITED = LAKE / "gold_quotes_sjc_historical.csv"
 
 EXT_V2 = LAKE
-OUT = ENRICHED / "master"
+OUT = LAKE  # flat output
 
 CHI_PER_OZ = 31.1034768 / 1.205  # 1 troy oz in chi
 LUONG_PER_OZ = CHI_PER_OZ / 37.5  # ~0.6886 troy oz per luong
@@ -170,8 +169,12 @@ def _gold_type_normalize(raw: str) -> str:
         return "pnj_gold"
     try:
         k = float(s)
+        # Numeric gold_type strings (e.g. "31.200", "34.950") are jewelry
+        # price indices on PNJ pages → treat same category as pnj_gold bar.
+        if "." in s and 5.0 <= k <= 100.0:
+            return "pnj_gold"
         if 5.0 <= k <= 25.0:
-            return "pnj_jewelry"
+            return "pnj_gold"
     except ValueError:
         pass
     return s.replace(" ", "_") if s else "other"
@@ -843,7 +846,7 @@ def main() -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "manifests").mkdir(parents=True, exist_ok=True)
 
-    writer = DataLakeWriter(out_dir, formats=["csv"])
+    writer = DataLakeWriter(out_dir, formats=["csv"], flat=True)
     targets = list(TABLE_BUILDERS.keys()) if "all" in args.tables else args.tables
 
     counts: dict[str, int] = {}
