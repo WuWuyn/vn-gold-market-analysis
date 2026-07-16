@@ -540,6 +540,7 @@ def build_figures(frames: dict[str, pd.DataFrame], summary: dict[str, Any]) -> d
     frame = frames.get("Model frame", pd.DataFrame()).copy()
     results = frames.get("Model results", pd.DataFrame()).copy()
     signals = frames.get("Trading signals", pd.DataFrame()).copy()
+    premium_enriched = read_csv("data/lake/pipeline_output_premium_enriched.csv")
 
     if not frame.empty:
         frame["date"] = safe_date_series(frame["date"])
@@ -581,7 +582,7 @@ def build_figures(frames: dict[str, pd.DataFrame], summary: dict[str, Any]) -> d
                 sub = agg[agg["horizon_months"].eq(horizon)].sort_values("mae").head(7)
                 axis.barh(sub["model"], sub["mae"], color="#4472C4")
                 axis.invert_yaxis()
-                axis.set_title(f"{horizon}d MAE")
+                axis.set_title(f"{horizon}m MAE")
                 axis.set_xlabel("MAE")
             fig.tight_layout()
             path = FIGURES / "final_03_model_leaderboard.png"
@@ -596,7 +597,7 @@ def build_figures(frames: dict[str, pd.DataFrame], summary: dict[str, Any]) -> d
             .agg(signal_rate=("buy_signal_any", "mean"), avg_actual=("avg_actual_return", "mean"))
         )
         if not sig.empty:
-            sig["label"] = sig["phase"].astype(str) + " " + sig["horizon_months"].astype(str) + "d"
+            sig["label"] = sig["phase"].astype(str) + " " + sig["horizon_months"].astype(str) + "m"
             fig, ax = plt.subplots(figsize=(9, 4))
             ax.bar(sig["label"], sig["signal_rate"] * 100, color="#70AD47")
             ax.set_title("Decision signal frequency")
@@ -606,6 +607,112 @@ def build_figures(frames: dict[str, pd.DataFrame], summary: dict[str, Any]) -> d
             fig.savefig(path, dpi=180, bbox_inches="tight")
             plt.close(fig)
             paths["signals"] = path
+
+            sig_ret = sig.copy()
+            sig_ret["avg_actual"] = pd.to_numeric(sig_ret["avg_actual"], errors="coerce")
+            sig_ret = sig_ret.dropna(subset=["avg_actual"])
+            if not sig_ret.empty:
+                fig, ax = plt.subplots(figsize=(9, 4))
+                colors = ["#4472C4" if value >= 0 else "#C00000" for value in sig_ret["avg_actual"]]
+                ax.bar(sig_ret["label"], sig_ret["avg_actual"] * 100, color=colors)
+                ax.axhline(0, color="#333333", linewidth=0.8)
+                ax.set_title("Average realized target on signal days")
+                ax.set_ylabel("Avg target return (%)")
+                ax.tick_params(axis="x", rotation=35)
+                path = FIGURES / "final_09_signal_return_by_horizon.png"
+                fig.savefig(path, dpi=180, bbox_inches="tight")
+                plt.close(fig)
+                paths["signal_return"] = path
+
+    if not frame.empty:
+        coverage_cols = [
+            "sell_price",
+            "buy_price",
+            "global_gold_vnd_per_luong",
+            "premium_pct",
+            "usd_vnd",
+            "gold_futures_close_usd_oz",
+            "vix",
+            "dxy_index",
+            "treasury_10y_pct",
+            "gpr",
+            "news_count_30d",
+            "net_return_1m",
+            "net_return_3m",
+            "net_return_5m",
+        ]
+        coverage_rows = []
+        for col in coverage_cols:
+            if col in frame.columns:
+                coverage_rows.append((col, frame[col].notna().mean() * 100))
+        if coverage_rows:
+            cov_df = pd.DataFrame(coverage_rows, columns=["field", "coverage"]).sort_values("coverage")
+            fig, ax = plt.subplots(figsize=(9, 5.2))
+            ax.barh(cov_df["field"], cov_df["coverage"], color="#5B9BD5")
+            ax.set_xlim(0, 100)
+            ax.set_title("Model-frame field coverage")
+            ax.set_xlabel("Non-null coverage (%)")
+            path = FIGURES / "final_05_data_coverage.png"
+            fig.savefig(path, dpi=180, bbox_inches="tight")
+            plt.close(fig)
+            paths["coverage"] = path
+
+        holding_cols = [f"holding_days_{horizon}m" for horizon in [1, 3, 5] if f"holding_days_{horizon}m" in frame.columns]
+        if holding_cols:
+            hold = frame[holding_cols].copy()
+            hold = hold.apply(pd.to_numeric, errors="coerce")
+            hold_long = hold.melt(var_name="horizon", value_name="holding_days").dropna()
+            hold_long["horizon"] = hold_long["horizon"].str.extract(r"(\d+)").iloc[:, 0] + "m"
+            if not hold_long.empty:
+                fig, ax = plt.subplots(figsize=(8, 4.2))
+                sns.boxplot(data=hold_long, x="horizon", y="holding_days", ax=ax, color="#A9D18E")
+                ax.set_title("Calendar-month target holding days")
+                ax.set_xlabel("Horizon")
+                ax.set_ylabel("Actual holding days")
+                path = FIGURES / "final_07_holding_days_distribution.png"
+                fig.savefig(path, dpi=180, bbox_inches="tight")
+                plt.close(fig)
+                paths["holding_days"] = path
+
+        target_cols = [f"net_return_{horizon}m" for horizon in [1, 3, 5] if f"net_return_{horizon}m" in frame.columns]
+        if target_cols:
+            target = frame[target_cols].copy()
+            target = target.apply(pd.to_numeric, errors="coerce") * 100
+            target_long = target.melt(var_name="horizon", value_name="target_return_pct").dropna()
+            target_long["horizon"] = target_long["horizon"].str.extract(r"(\d+)").iloc[:, 0] + "m"
+            if not target_long.empty:
+                fig, ax = plt.subplots(figsize=(8, 4.2))
+                sns.boxplot(data=target_long, x="horizon", y="target_return_pct", ax=ax, color="#F4B183", showfliers=False)
+                ax.axhline(0, color="#333333", linewidth=0.8)
+                ax.set_title("Target return distribution by calendar horizon")
+                ax.set_xlabel("Horizon")
+                ax.set_ylabel("Net return after spread (%)")
+                path = FIGURES / "final_08_target_distribution.png"
+                fig.savefig(path, dpi=180, bbox_inches="tight")
+                plt.close(fig)
+                paths["target_distribution"] = path
+
+    if not premium_enriched.empty:
+        quality_col = "source_quality" if "source_quality" in premium_enriched.columns else None
+        if quality_col is None and "is_proxy" in premium_enriched.columns:
+            premium_enriched["source_quality"] = np.where(
+                premium_enriched["is_proxy"].astype(str).str.lower().isin(["true", "1"]),
+                "proxy",
+                "direct_or_official",
+            )
+            quality_col = "source_quality"
+        if quality_col:
+            quality_counts = premium_enriched[quality_col].fillna("unknown").value_counts().head(8)
+            if not quality_counts.empty:
+                fig, ax = plt.subplots(figsize=(8, 4.2))
+                ax.bar(quality_counts.index.astype(str), quality_counts.values, color="#8064A2")
+                ax.set_title("Premium reference source quality")
+                ax.set_ylabel("Rows")
+                ax.tick_params(axis="x", rotation=25)
+                path = FIGURES / "final_06_premium_source_quality.png"
+                fig.savefig(path, dpi=180, bbox_inches="tight")
+                plt.close(fig)
+                paths["premium_quality"] = path
 
     return paths
 
@@ -944,6 +1051,203 @@ def add_literature_review(doc: Document) -> None:
     )
 
 
+def add_data_dictionary_section(doc: Document, figure_paths: dict[str, Path]) -> None:
+    add_heading(doc, "3.1. Data dictionary và khái niệm trường dữ liệu", 2)
+    add_para(
+        doc,
+        "Phần này đặt định nghĩa biến ngay cạnh kiểm kê dữ liệu để người đọc hiểu một cột trong CSV đang đại diện cho đại lượng kinh tế nào. Với vàng Việt Nam, cùng là 'giá vàng' nhưng nếu không phân biệt giá mua, giá bán, fair value toàn cầu, premium và spread thì mô hình rất dễ học nhầm tín hiệu.",
+    )
+    add_table(
+        doc,
+        ["Nhóm biến", "Trường chính", "Đơn vị / grain", "Cách đọc kinh tế", "Rủi ro dữ liệu"],
+        [
+            [
+                "Domestic SJC target",
+                "buy_price, sell_price, mid_price, spread_pct",
+                "VND/lượng, một dòng mỗi ngày",
+                "Giá bán là chi phí vào lệnh; giá mua tương lai là giá thoát vị thế. Spread là chi phí giao dịch thực tế.",
+                "Raw crawl có mixed-grain, giá 0 hoặc spread âm nên chỉ canonical daily được dùng làm target.",
+            ],
+            [
+                "Global fair value",
+                "global_gold_usd_oz, usd_vnd, global_gold_vnd_per_luong",
+                "USD/oz, VND/USD, VND/lượng",
+                "Neo giá quốc tế sau khi đổi từ troy ounce sang lượng Việt Nam bằng 37.5 / 31.1034768.",
+                "LBMA historical thiếu licence nên một phần dùng GC=F/global close proxy và phải gắn cờ nguồn.",
+            ],
+            [
+                "Premium SJC",
+                "premium, premium_pct, source_quality, is_proxy",
+                "VND/lượng và %",
+                "Phần giá nội địa cao hơn fair value toàn cầu. Premium cao vừa phản ánh khan hiếm vừa làm điểm mua đắt hơn.",
+                "Nếu nguồn reference/FX bị thiếu hoặc proxy nhiều, kết luận premium chỉ nên đọc theo hướng directional.",
+            ],
+            [
+                "Macro / FX",
+                "usd_vnd_mid, vix, dxy_index, treasury_10y_pct, oil_wti_usd_barrel",
+                "Daily/as-of",
+                "Mô tả điều kiện USD, lãi suất, rủi ro và chi phí cơ hội nắm giữ vàng.",
+                "Phải lag/as-of theo ngày công bố; không dùng dữ liệu đóng cửa quốc tế sau thời điểm quyết định tại Việt Nam.",
+            ],
+            [
+                "Event / News",
+                "event_type, severity, news_count, sentiment, availability_from",
+                "Daily event panel",
+                "Đo cường độ thông tin và chính sách có thể làm thay đổi premium, spread hoặc nhu cầu safe-haven.",
+                "Backfill headline không được dùng như realtime signal nếu chưa chứng minh availability_from <= feature_date.",
+            ],
+            [
+                "Targets",
+                "target_date_1m/3m/5m, exit_date_1m/3m/5m, net_return_1m/3m/5m",
+                "Tháng lịch",
+                "Lợi suất thực thi: mua theo sell_price hôm nay và bán lại theo buy_price tại ngày exit khả dụng sau target month.",
+                "Không được diễn giải 21/63/105 dòng là 1/3/5 tháng khi frame có một dòng mỗi ngày lịch.",
+            ],
+        ],
+        max_rows=10,
+    )
+    add_picture_if_exists(doc, figure_paths.get("coverage", Path()), "Figure 0A. Field coverage trong model frame")
+    add_para(
+        doc,
+        "Coverage chart cho biết biến nào thực sự có mặt trong frame huấn luyện. Đây là kiểm tra quan trọng trước khi bàn về model: một feature có ý nghĩa kinh tế tốt nhưng coverage thấp có thể làm model học không ổn định hoặc chỉ hoạt động trong một đoạn lịch sử hẹp.",
+    )
+    add_picture_if_exists(doc, figure_paths.get("premium_quality", Path()), "Figure 0B. Source quality của premium/reference")
+    add_para(
+        doc,
+        "Source-quality chart giúp tách câu hỏi 'có đủ dữ liệu để tính premium không' khỏi câu hỏi 'premium đó có phải benchmark chính thức không'. Báo cáo dùng proxy khi cần tính liên tục, nhưng luôn giữ cờ nguồn để sensitivity có thể tách high-quality-only khỏi proxy-inclusive.",
+    )
+
+
+def add_methodology_notebook_section(doc: Document, figure_paths: dict[str, Path]) -> None:
+    add_heading(doc, "5.2. Methodology notebook: công thức, artifact và validation gate", 2)
+    add_para(
+        doc,
+        "Khối này trình bày theo kiểu notebook: mỗi bước có input artifact, phép biến đổi, output và cổng kiểm tra. Mục tiêu là để người đọc không chỉ thấy kết luận, mà còn thấy con đường dữ liệu đi từ raw crawl tới forecast và quyết định mua.",
+    )
+    add_table(
+        doc,
+        ["Đại lượng", "Công thức / rule", "Ý nghĩa", "Validation gate"],
+        [
+            [
+                "Global gold VND/lượng",
+                "gold_usd_oz * usd_vnd * 37.5 / 31.1034768",
+                "Đổi USD/troy oz sang VND/lượng Việt Nam. Đây là lỗi nghiêm trọng đã sửa so với logic 1.205 gram.",
+                "stored/correct median phải quanh 1.0, không quanh 1.205.",
+            ],
+            [
+                "Premium",
+                "sell_consensus - global_gold_vnd_per_luong; premium_pct = premium / global_gold_vnd_per_luong",
+                "Đo phần chênh giá SJC so với fair value toàn cầu quy đổi.",
+                "premium_pct không âm hàng loạt bất hợp lý sau khi sửa đơn vị; missing được audit theo năm/source.",
+            ],
+            [
+                "Spread",
+                "sell_price - buy_price; spread_pct = spread / mid_price",
+                "Chi phí round-trip tối thiểu của người mua vàng vật chất.",
+                "Canonical target loại buy<=0, sell<=0 và sell<buy.",
+            ],
+            [
+                "Target month",
+                "target_date_h = date + h calendar months; exit_date_h = first available price date >= target_date_h",
+                "Đúng nghĩa 1/3/5 tháng lịch thay vì số dòng trong daily panel.",
+                "exit_date >= target_date; holding_days được phân phối quanh tháng lịch tương ứng.",
+            ],
+            [
+                "Net return",
+                "future_buy_price_h / current_sell_price - 1",
+                "Lợi suất thực thi sau spread: mua theo giá bán, thoát theo giá mua.",
+                "Target non-null được đếm riêng từng horizon và không dùng hàng chưa có exit.",
+            ],
+            [
+                "Decision rule",
+                "buy nếu expected_return > 0, P(return>0) đủ cao và q10 downside không vượt sàn rủi ro",
+                "Kết hợp kỳ vọng, xác suất thắng và kịch bản xấu q10.",
+                "Signal được backtest theo validation/test và ghi paper-trading nếu sau snapshot.",
+            ],
+        ],
+        max_rows=10,
+    )
+    add_para(
+        doc,
+        "Bảng công thức trên là phần xương sống của báo cáo. Điểm quan trọng nhất là target và premium đều mô phỏng hành vi mua bán có thể thực thi: premium dựa trên VND/lượng đúng đơn vị, còn return dựa trên giá mua lại trong tương lai chứ không phải giá mid lý tưởng.",
+    )
+    add_code_block(
+        doc,
+        "Công thức quy đổi premium đúng đơn vị",
+        "scripts/pipeline/improve_premium_coverage.py",
+        200,
+        209,
+        "Đoạn code này là bằng chứng kỹ thuật cho công thức gold_usd_oz * USD/VND * 37.5 / 31.1034768.",
+    )
+    add_code_block(
+        doc,
+        "Target theo tháng lịch và ngày exit khả dụng",
+        "src/gold_collectors/modeling/decision_support.py",
+        386,
+        430,
+        "Target không còn dùng shift theo số dòng; mỗi horizon lấy target_date theo tháng lịch rồi tìm ngày giá khả dụng gần nhất sau đó.",
+    )
+    add_picture_if_exists(doc, figure_paths.get("holding_days", Path()), "Figure 0C. Holding-day distribution của target tháng lịch")
+    add_para(
+        doc,
+        "Holding-day distribution là kiểm tra trực quan cho lỗi horizon trước đây. Nếu 1/3/5 tháng được tạo đúng, số ngày nắm giữ phải xoay quanh tháng lịch tương ứng và có dao động do cuối tuần/ngày thiếu giá, không cố định cứng 21/63/105 dòng.",
+    )
+    add_picture_if_exists(doc, figure_paths.get("target_distribution", Path()), "Figure 0D. Phân phối target return sau spread")
+    add_para(
+        doc,
+        "Target distribution cho thấy bài toán không cân xứng: cùng một frame nhưng horizon dài có phân phối lợi suất khác horizon ngắn. Vì vậy report không dùng một model chung cho mọi horizon, mà train/evaluate riêng 1 tháng, 3 tháng và 5 tháng.",
+    )
+    add_table(
+        doc,
+        ["Bước", "Input artifact", "Transformation", "Output artifact", "Validation gate"],
+        [
+            [
+                "Canonical domestic",
+                "raw/crawl domestic gold tables",
+                "Chuẩn hóa unit, chọn SJC daily target, loại giá 0 và spread âm",
+                "gold_quotes_sjc_historical.csv, gold_domestic_daily_panel.csv",
+                "unique by date trong canonical; no buy<=0, sell<=0, sell<buy",
+            ],
+            [
+                "Reference/premium",
+                "global_reference_daily.csv, FX, LBMA/GC=F proxy",
+                "Quy đổi USD/oz sang VND/lượng, tính premium và proxy flag",
+                "pipeline_output_premium_enriched.csv",
+                "conversion audit pass; premium missing và proxy share được ghi",
+            ],
+            [
+                "As-of feature frame",
+                "domestic, premium, macro, GPR, events, news",
+                "merge_asof/availability guard, tạo lag và rolling windows",
+                "model_frame_daily.csv",
+                "feature availability <= feature_date; unique by date",
+            ],
+            [
+                "Calendar targets",
+                "model_frame_daily.csv + canonical prices",
+                "Tạo target_date/exit_date/holding_days/net_return cho 1/3/5 tháng",
+                "model_frame_daily.csv",
+                "exit_date >= target_date; target non-null count khớp summary",
+            ],
+            [
+                "Modeling",
+                "model_frame_daily.csv, feature_columns.json",
+                "Walk-forward train/evaluate baseline, linear, SARIMAX, RF, boosting, quantile",
+                "model_results.csv, decision_signals.csv",
+                "Không random split; optional model chỉ công bố nếu train thật",
+            ],
+            [
+                "Decision monitoring",
+                "snapshot_forecasts.csv, latest canonical prices",
+                "Ghi ledger sau snapshot; open nếu chưa đáo hạn",
+                "paper_trading_ledger.csv",
+                "Không tính realized return cho open trades",
+            ],
+        ],
+        max_rows=10,
+    )
+
+
 def add_data_sections(
     doc: Document,
     profiles: list[DataProfile],
@@ -970,7 +1274,8 @@ def add_data_sections(
         [[p.name, f"{p.rows:,}", f"{p.cols:,}", p.date_span, p.role] for p in profiles],
         max_rows=20,
     )
-    add_heading(doc, "3.1. Minh chá»©ng dá»¯ liá»‡u crawl vÃ  artifact thu tháº­p", 2)
+    add_data_dictionary_section(doc, figure_paths)
+    add_heading(doc, "3.2. Minh chá»©ng dá»¯ liá»‡u crawl vÃ  artifact thu tháº­p", 2)
     add_para(
         doc,
         "Ngay trong pháº§n collection, bÃ¡o cÃ¡o trÃ­ch má»™t sá»‘ dÃ²ng tháº­t tá»« data lake Ä‘á»ƒ chá»©ng minh nguá»“n dá»¯ liá»‡u Ä‘Ã£ Ä‘Æ°á»£c crawl/chuáº©n hÃ³a. CÃ¡c báº£ng nÃ y khÃ´ng pháº£i vÃ­ dá»¥ minh há»a tá»± táº¡o: chÃºng Ä‘Æ°á»£c Ä‘á»c trá»±c tiáº¿p tá»« CSV trong data/lake khi build DOCX.",
@@ -1001,7 +1306,7 @@ def add_data_sections(
         add_para(doc, "News availability sample: báº£ng nÃ y giáº£i thÃ­ch vÃ¬ sao headline Ä‘Æ°á»£c tÃ¡ch thÃ nh research mode vÃ  strict realtime mode.")
         add_table(doc, [c for c in cols if c in news.columns], rows_from_frame(news, cols, max_rows=5, max_chars=120), max_rows=5)
 
-    add_heading(doc, "3.2. Code crawl SBV Ä‘i kÃ¨m káº¿t quáº£ discovery", 2)
+    add_heading(doc, "3.3. Code crawl SBV Ä‘i kÃ¨m káº¿t quáº£ discovery", 2)
     add_code_block(
         doc,
         "SBV discovery báº±ng Playwright vÃ  endpoint headless-delivery",
@@ -1062,8 +1367,8 @@ def add_data_sections(
         doc,
         "Target lá»£i suáº¥t sau spread",
         "src/gold_collectors/modeling/decision_support.py",
-        375,
         386,
+        430,
         "ÄÃ¢y lÃ  Ä‘oáº¡n biáº¿n bÃ i toÃ¡n dá»± bÃ¡o giÃ¡ thÃ nh bÃ i toÃ¡n lá»£i suáº¥t thá»±c thi: mua theo sell_price hiá»‡n táº¡i vÃ  thoÃ¡t theo future buy_price.",
     )
     add_code_block(
@@ -1096,6 +1401,8 @@ def add_data_sections(
         available = [c for c in cols if c in frame.columns]
         add_para(doc, "Model frame sample á»Ÿ cuá»‘i snapshot: dá»¯ liá»‡u Ä‘Ã£ Ä‘Æ°á»£c ghÃ©p cÃ¹ng grain ngÃ y, kÃ¨m target tÆ°Æ¡ng lai cho tá»«ng horizon.")
         add_table(doc, available, rows_from_frame(frame[available].tail(5), available, max_rows=5, max_chars=80), max_rows=5)
+
+    add_methodology_notebook_section(doc, figure_paths)
 
     add_heading(doc, "6. EDA: GiÃ¡, premium, thanh khoáº£n vÃ  sá»± kiá»‡n", 1)
     add_para(
@@ -1163,6 +1470,49 @@ def add_modeling_sections(
     )
     add_table(
         doc,
+        ["Model family", "Vai trò trong phân tích", "Điều kiện đưa vào leaderboard", "Caveat chính"],
+        [
+            [
+                "Zero/mean/median baseline",
+                "Mốc sàn để biết model phức tạp có thật sự tạo thêm giá trị.",
+                "Luôn chạy được trên target non-null.",
+                "Không học regime; chỉ hữu ích làm benchmark.",
+            ],
+            [
+                "Ridge / ElasticNet",
+                "Kiểm tra quan hệ tuyến tính có regularization giữa premium, FX, macro và target.",
+                "Train trên walk-forward folds với feature imputation.",
+                "Không bắt tốt tương tác phi tuyến hoặc threshold chính sách.",
+            ],
+            [
+                "SARIMAX + exog / VECM-style checks",
+                "Đưa cấu trúc chuỗi thời gian và biến ngoại sinh vào baseline thống kê.",
+                "Chỉ công bố fold chạy ổn định; lỗi convergence được ghi blocker.",
+                "Nhạy với non-stationarity và regime break.",
+            ],
+            [
+                "Random Forest / Gradient Boosting",
+                "Bắt phi tuyến giữa premium, spread, events, FX và rủi ro toàn cầu.",
+                "Phải train thật trên frame as-of; không dùng import thành công như kết quả.",
+                "Dễ overfit nếu signal quá dày hoặc feature coverage lệch theo thời gian.",
+            ],
+            [
+                "LightGBM / XGBoost / CatBoost",
+                "Ứng viên tabular boosting mạnh cho feature nhiều cột và tương tác phức tạp.",
+                "Chỉ xuất hiện khi dependency cài được và model chạy xong trong pipeline.",
+                "Cần so với baseline bằng walk-forward, không chỉ nhìn one-shot score.",
+            ],
+            [
+                "DeepAR / TFT",
+                "Ứng viên probabilistic multi-horizon sau khi strict-as-of frame ổn định.",
+                "Chưa promote nếu runner/dependency/deployment chưa đủ chắc.",
+                "Không thay bằng kết quả giả; chỉ ghi hướng nâng cấp.",
+            ],
+        ],
+        max_rows=10,
+    )
+    add_table(
+        doc,
         ["Horizon", "Best MAE model", "MAE", "RMSE", "DA", "Best DA model", "Best DA"],
         mean_rows,
     )
@@ -1175,8 +1525,8 @@ def add_modeling_sections(
         doc,
         "Optional model training cho LightGBM/XGBoost/CatBoost",
         "src/gold_collectors/modeling/decision_support.py",
-        713,
-        753,
+        746,
+        792,
         "Äoáº¡n code nÃ y náº±m ngay cáº¡nh leaderboard Ä‘á»ƒ chá»©ng minh cÃ¡c mÃ´ hÃ¬nh boosting chá»‰ xuáº¥t hiá»‡n khi import Ä‘Æ°á»£c vÃ  train tháº­t, khÃ´ng pháº£i ghi giáº£ trong bÃ¡o cÃ¡o.",
     )
     if quant_rows:
@@ -1189,6 +1539,7 @@ def add_modeling_sections(
         add_para(doc, "Decision-rule backtest vá»›i rule P(return>0) >= 0.50 vÃ  q10 >= -10%:")
         add_table(doc, ["Horizon", "Phase", "Signals", "Signal rate", "Avg buy-day ret", "Avg strategy ret"], decision_rows)
         add_picture_if_exists(doc, figure_paths.get("signals", Path()), "Figure 4. Decision signal frequency")
+        add_picture_if_exists(doc, figure_paths.get("signal_return", Path()), "Figure 5. Average target return on signal days")
         add_para(
             doc,
             "Decision-rule backtest tráº£ lá»i cÃ¢u há»i khÃ¡c vá»›i leaderboard: náº¿u chá»‰ mua vÃ o nhá»¯ng ngÃ y mÃ´ hÃ¬nh báº­t tÃ­n hiá»‡u, káº¿t quáº£ trung bÃ¬nh cá»§a cÃ¡c ngÃ y Ä‘Ã³ ra sao. Tá»· lá»‡ phÃ¡t tÃ­n hiá»‡u quÃ¡ cao cÃ³ thá»ƒ nghÄ©a lÃ  rule thiáº¿u chá»n lá»c; tá»· lá»‡ quÃ¡ tháº¥p cÃ³ thá»ƒ nghÄ©a lÃ  mÃ´ hÃ¬nh khÃ´ng Ä‘á»§ cÆ¡ há»™i thá»±c thi. VÃ¬ váº­y bÃ¡o cÃ¡o Ä‘á»c Ä‘á»“ng thá»i signal rate, average buy-day return vÃ  consistency giá»¯a validation/test.",
@@ -1197,8 +1548,8 @@ def add_modeling_sections(
             doc,
             "Decision rule tá»« xÃ¡c suáº¥t vÃ  q10 downside",
             "src/gold_collectors/modeling/decision_support.py",
-            930,
-            945,
+            960,
+            990,
             "TÃ­n hiá»‡u mua khÃ´ng chá»‰ dá»±a vÃ o expected return; rule yÃªu cáº§u P(return>0) vÆ°á»£t ngÆ°á»¡ng vÃ  q10 khÃ´ng tháº¥p hÆ¡n sÃ n rá»§i ro.",
         )
 
@@ -1213,6 +1564,14 @@ def add_modeling_sections(
     )
     if snapshot_rows:
         add_table(doc, ["Horizon", "Expected return", "Q10 downside", "P(return>0)", "Khuyáº¿n nghá»‹"], snapshot_rows)
+    add_code_block(
+        doc,
+        "Snapshot forecast dùng latest feature row",
+        "scripts/analysis/build_full_report.py",
+        776,
+        850,
+        "Report tự tái tính snapshot forecast từ model frame và feature_columns.json để headline recommendation khớp artifact sinh ra.",
+    )
     snapshot = read_csv("data/lake/modeling/snapshot_forecasts.csv")
     if not snapshot.empty:
         cols = ["snapshot_date", "horizon_months", "predicted_net_return", "q10_predicted_net_return", "prob_return_positive", "buy_signal", "status"]
@@ -1524,8 +1883,8 @@ def add_evidence_sections(doc: Document, summary: dict[str, Any]) -> None:
         doc,
         "Target lá»£i suáº¥t sau spread",
         "src/gold_collectors/modeling/decision_support.py",
-        375,
         386,
+        430,
         "ÄÃ¢y lÃ  Ä‘oáº¡n biáº¿n bÃ i toÃ¡n dá»± bÃ¡o giÃ¡ thÃ nh bÃ i toÃ¡n lá»£i suáº¥t thá»±c thi: mua theo sell_price hiá»‡n táº¡i vÃ  thoÃ¡t theo future buy_price.",
     )
     add_code_block(
@@ -1556,16 +1915,16 @@ def add_evidence_sections(doc: Document, summary: dict[str, Any]) -> None:
         doc,
         "Optional model training cho LightGBM/XGBoost/CatBoost",
         "src/gold_collectors/modeling/decision_support.py",
-        713,
-        753,
+        746,
+        792,
         "CÃ¡c mÃ´ hÃ¬nh boosting khÃ´ng cÃ²n lÃ  blocker dependency; náº¿u import Ä‘Æ°á»£c thÃ¬ Ä‘Æ°á»£c Ä‘Æ°a vÃ o optional_models vÃ  train tháº­t.",
     )
     add_code_block(
         doc,
         "Decision rule tá»« xÃ¡c suáº¥t vÃ  q10 downside",
         "src/gold_collectors/modeling/decision_support.py",
-        930,
-        945,
+        960,
+        990,
         "TÃ­n hiá»‡u mua khÃ´ng chá»‰ dá»±a vÃ o expected return; rule yÃªu cáº§u P(return>0) vÆ°á»£t ngÆ°á»¡ng vÃ  q10 khÃ´ng tháº¥p hÆ¡n sÃ n rá»§i ro.",
     )
 
@@ -1757,6 +2116,7 @@ def main() -> None:
     add_data_sections(doc, profiles, quality_rows, eda_tables, figure_paths)
     add_modeling_sections(doc, mean_rows, quant_rows, decision_perf_rows, snapshot_rows, recommendation, summary, figure_paths)
     add_next_data_expansion_section(doc, summary)
+    add_evidence_sections(doc, summary)
     add_appendix(doc, summary)
 
     doc.save(OUT)
